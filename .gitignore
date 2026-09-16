@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+# Uploaded proof-of-delivery files stay out of the repository (phase 7).
+uploads/

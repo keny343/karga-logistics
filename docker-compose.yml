@@ -1,0 +1,71 @@
+# One command for a working development environment: database, API and web app.
+#
+# There are no Dockerfiles yet on purpose. In development the code is bind-mounted
+# into the official Node image, so a container never holds a stale copy of the
+# source. Production images belong to the deployment phase, where the target
+# platform decides their shape.
+#
+#   docker compose up
+#   API   http://localhost:4100
+#   Web   http://localhost:5175
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: karga
+      POSTGRES_PASSWORD: karga_dev
+      POSTGRES_DB: karga
+    ports:
+      - '5433:5432'
+    volumes:
+      - karga_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The API waits for this: a container that is up is not the same as a
+      # database that accepts connections.
+      test: ['CMD-SHELL', 'pg_isready -U karga -d karga']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run migrate && npm run dev"
+    environment:
+      NODE_ENV: development
+      PORT: '4100'
+      DATABASE_URL: postgresql://karga:karga_dev@postgres:5432/karga
+      DATABASE_SSL: 'false'
+      CORS_ORIGINS: http://localhost:5175
+      LOG_LEVEL: info
+    ports:
+      - '4100:4100'
+    volumes:
+      - ./backend:/app
+      - karga_backend_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      # Inside the network the API is a service name, not localhost.
+      KARGA_API_TARGET: http://backend:4100
+    ports:
+      - '5175:5175'
+    volumes:
+      - ./frontend:/app
+      - karga_frontend_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  karga_pgdata:
+  # Host and container run different platforms, so their installed binaries must
+  # not share a directory.
+  karga_backend_modules:
+  karga_frontend_modules:
