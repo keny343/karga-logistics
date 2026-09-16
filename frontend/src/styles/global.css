@@ -14,28 +14,46 @@ body,
 
 body {
   margin: 0;
-  background: var(--surface-0);
-  color: var(--text);
+  background: var(--color-background);
+  color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: 1.45;
+  font-size: var(--text-body);
+  line-height: var(--text-body-lh);
   -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  color: var(--color-text);
 }
 
 h1 {
-  font-size: var(--text-xl);
+  font-size: var(--text-page);
+  line-height: var(--text-page-lh);
+  font-weight: 700;
+}
+
+h2 {
+  font-size: var(--text-section);
+  line-height: var(--text-section-lh);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: var(--text-card);
+  line-height: var(--text-card-lh);
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
 }
 
 a {
-  color: var(--accent);
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -43,25 +61,31 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Focus must be visible for keyboard users; never remove it without replacing it. */
+/* Focus must always be visible for keyboard users. */
 :focus-visible {
-  outline: var(--focus-ring);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font: inherit;
+  color: inherit;
+}
+
+button {
   cursor: pointer;
 }
 
 code,
-kbd,
 .mono {
   font-family: var(--font-mono);
   font-size: 0.95em;
 }
 
-/* Respect a stated preference for less motion instead of overriding it. */
+/* Motion stays short, and disappears when the user asked for less of it. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

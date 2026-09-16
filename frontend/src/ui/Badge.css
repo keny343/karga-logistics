@@ -1,0 +1,40 @@
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-lh);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge[data-tone='neutral'] {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.badge[data-tone='info'] {
+  background: var(--color-info-soft);
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.badge[data-tone='success'] {
+  background: var(--color-success-soft);
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.badge[data-tone='warning'] {
+  background: var(--color-warning-soft);
+  border-color: #fed7aa;
+  color: #b45309;
+}
+
+.badge[data-tone='danger'] {
+  background: var(--color-danger-soft);
+  border-color: #fecaca;
+  color: #b91c1c;
+}

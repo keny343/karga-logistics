@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -42,6 +43,9 @@ export const createApp = (): Express => {
 
   app.use(express.json({ limit: '256kb' }));
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
+  // Session cookies are read here and nowhere else; no signing secret is needed
+  // because the cookie carries an opaque token, not data the server trusts.
+  app.use(cookieParser());
 
   app.use(
     '/api',

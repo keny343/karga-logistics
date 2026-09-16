@@ -1,7 +1,7 @@
 # Security
 
-What is implemented in phase 1 is marked as such. Items belonging to later phases
-say so, so this document cannot be mistaken for a claim.
+What is implemented is described in the present tense. Items belonging to later
+phases say so, so this document cannot be mistaken for a claim.
 
 ## In place now
 
@@ -47,12 +47,40 @@ authenticated session and never from the request body or query string.
 A resource that belongs to another company answers **404, not 403**. `403` confirms
 that the id exists, which is itself information a tenant should not have.
 
-## Phase 2 (authentication)
+## Authentication
 
-Planned, and not yet present: password hashing with bcrypt at cost 12, sessions in
-`httpOnly`, `SameSite=Lax`, `Secure` cookies, per-account and per-IP login
-throttling, and an authorization chain that checks, in order, authentication →
-role → company → resource ownership.
+**Passwords hashed with bcrypt at cost 12.** The test suite drops to the minimum
+cost: it hashes dozens of passwords per run, and what those tests check is the
+logic around the hash, not the cost factor.
+
+**Server-side sessions, not JWTs.** The cookie carries 32 bytes of randomness,
+base64url encoded. Only its SHA-256 hash is stored, so a database dump does not
+hand over live sessions — and because the token is high-entropy rather than a
+guessable password, a fast hash is the right choice here. Logging out revokes the
+row, so the cookie stops working immediately.
+
+**Cookie flags.** `httpOnly` so no script can read it, `SameSite=Lax` so a
+cross-site form cannot replay it while ordinary navigation still works, `Secure`
+everywhere except local development, where there is no HTTPS to attach it to,
+`path=/`, and a seven-day expiry.
+
+**Identical answer for a wrong password and an unknown account.** Telling them
+apart hands an attacker a list of valid emails. When an account does not exist, a
+throwaway hash is still computed, so the response does not come back measurably
+faster.
+
+**Login throttling in the database.** Five failures on one account or twenty from
+one address within fifteen minutes answer `429`, including for the correct
+password. A counter in process memory would reset on every deploy and would not be
+shared between instances. On top of that, a rate limiter in front of the endpoint
+stops a flood before it reaches bcrypt, which is deliberately expensive.
+
+**The authorization chain, in order.** Authentication (`requerAutenticacao`), then
+role (`requerPapel`), then company (`empresaDe`, always from the session), then
+ownership of the resource (in the service: a driver may only move the parcels
+assigned to him). Each step is separate so a new endpoint cannot get half of it,
+and the route guards in the interface are convenience only — the API checks
+independently.
 
 ## Phase 7 (uploads)
 
@@ -66,6 +94,19 @@ path.
 `audit_logs` records sensitive actions with actor, action, resource, request id and
 IP. It never stores passwords, tokens or session identifiers. Rows are append-only
 and survive the deletion of the account that caused them.
+
+Recorded today: `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `ORDER_CREATED`,
+`ORDER_ASSIGNED`, `DELIVERY_PICKED_UP`, `DELIVERY_STARTED`, `DELIVERY_COMPLETED`,
+`DELIVERY_FAILED`, `ORDER_CANCELLED`, `ORDER_RETURNED`, `CUSTOMER_CREATED`,
+`DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`.
+
+A failed audit write never fails the request: by then the action has already
+succeeded, and refusing it afterwards would be worse than a missing row. The
+failure is logged as an error instead.
+
+Separately from the audit trail, `order_status_history` keeps every accepted
+transition with the state it came from, the actor and any note — so the path an
+order took is reconstructable even if a later bug corrupts `orders.status`.
 
 ## Reporting
 

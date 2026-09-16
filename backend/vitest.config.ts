@@ -8,6 +8,9 @@ export default defineConfig({
     // Tests share one Postgres database, so they run one file at a time. Parallel
     // files would fight over the same rows.
     fileParallelism: false,
+    // Integration tests hash passwords and open transactions; 5 seconds is tight
+    // enough that a slow machine reports a timeout instead of a real failure.
+    testTimeout: 20_000,
     env: {
       NODE_ENV: 'test',
       DATABASE_URL:

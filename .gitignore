@@ -11,3 +11,5 @@ npm-debug.log*
 .vscode/
 # Uploaded proof-of-delivery files stay out of the repository (phase 7).
 uploads/
+# TypeScript incremental build state.
+*.tsbuildinfo

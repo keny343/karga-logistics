@@ -1,0 +1,17 @@
+.form-encomenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-encomenda__par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 767px) {
+  .form-encomenda__par {
+    grid-template-columns: 1fr;
+  }
+}

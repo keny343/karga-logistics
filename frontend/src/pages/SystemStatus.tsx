@@ -1,32 +1,41 @@
 import { useEffect, useState } from 'react';
-import { ApiError, api, type Health } from '../api/client';
-import { StatusPill, type StatusGroup } from '../components/StatusPill';
+import { ApiError, api } from '../api/client';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { PageHeader } from '../ui/PageHeader';
+import type { Tone } from '../domain/orderStatus';
 import './SystemStatus.css';
+
+interface Health {
+  readonly status: string;
+  readonly service: string;
+  readonly uptimeSeconds: number;
+}
 
 type Estado =
   | { fase: 'a-verificar' }
   | { fase: 'ok'; health: Health; verificadoEm: Date }
   | { fase: 'falha'; mensagem: string; verificadoEm: Date; requestId?: string };
 
-const grupo = (estado: Estado): StatusGroup => {
-  if (estado.fase === 'ok') return 'done';
-  if (estado.fase === 'falha') return 'failed';
-  return 'pending';
+const TOM: Record<Estado['fase'], Tone> = {
+  'a-verificar': 'neutral',
+  ok: 'success',
+  falha: 'danger',
 };
 
-const rotulo = (estado: Estado): string => {
-  if (estado.fase === 'ok') return 'API operacional';
-  if (estado.fase === 'falha') return 'API inacessível';
-  return 'A verificar';
+const ROTULO: Record<Estado['fase'], string> = {
+  'a-verificar': 'A verificar',
+  ok: 'API operacional',
+  falha: 'API inacessível',
 };
 
 const hora = (data: Date): string =>
   data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 /**
- * Phase 1 has no business screens yet, so the entry point shows the one thing
- * that is real: whether this build can reach its API. It doubles as the first
- * piece of the operational identity - dense, monospaced, no marketing.
+ * A diagnostics page, reachable at /estado without signing in. It exists so that
+ * "the app is broken" can be answered with "the API answers, in this many seconds
+ * of uptime" or with the request id of the failure.
  */
 export const SystemStatus = () => {
   const [estado, setEstado] = useState<Estado>({ fase: 'a-verificar' });
@@ -54,21 +63,16 @@ export const SystemStatus = () => {
   }, []);
 
   return (
-    <main className="status">
-      <header className="status__header">
-        <div>
-          <h1>Karga Logistics</h1>
-          <p className="status__sub">Operações de entrega de última milha — Luanda, Angola</p>
-        </div>
-        <StatusPill label={rotulo(estado)} group={grupo(estado)} />
-      </header>
+    <main className="estado-sistema">
+      <PageHeader
+        title="Estado do sistema"
+        description="Karga Logistics — operações de entrega de última milha, Luanda."
+        actions={<Badge tone={TOM[estado.fase]}>{ROTULO[estado.fase]}</Badge>}
+      />
 
-      <section className="panel" aria-labelledby="fundacao">
-        <h2 id="fundacao" className="panel__title">
-          Fundação
-        </h2>
-        <dl className="kv">
-          <div className="kv__row">
+      <Card title="API">
+        <dl className="dados">
+          <div>
             <dt>Serviço</dt>
             <dd className="mono">
               {estado.fase === 'ok'
@@ -77,38 +81,24 @@ export const SystemStatus = () => {
             </dd>
           </div>
           {estado.fase === 'falha' ? (
-            <div className="kv__row">
+            <div>
               <dt>Motivo</dt>
-              <dd className="status__erro">
+              <dd className="estado-sistema__erro">
                 {estado.mensagem}
                 {estado.requestId !== undefined ? (
-                  <>
-                    {' '}
-                    <span className="mono status__rid">({estado.requestId})</span>
-                  </>
+                  <span className="mono"> ({estado.requestId})</span>
                 ) : null}
               </dd>
             </div>
           ) : null}
-          <div className="kv__row">
+          <div>
             <dt>Verificado</dt>
             <dd className="mono">
               {estado.fase === 'a-verificar' ? '—' : hora(estado.verificadoEm)}
             </dd>
           </div>
         </dl>
-      </section>
-
-      <section className="panel" aria-labelledby="proximo">
-        <h2 id="proximo" className="panel__title">
-          A construir
-        </h2>
-        <p className="panel__texto">
-          Autenticação com isolamento por empresa, encomendas com máquina de estados, atribuição a
-          motoristas, mapa operacional, localização em tempo real e prova de entrega. Cada fase entra
-          com testes.
-        </p>
-      </section>
+      </Card>
     </main>
   );
 };

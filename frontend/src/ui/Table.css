@@ -1,0 +1,55 @@
+.tabela__envolvente {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-small);
+  line-height: var(--text-small-lh);
+}
+
+.tabela th {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.tabela td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabela th[data-numeric='true'],
+.tabela td[data-numeric='true'] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabela tbody tr[data-clicavel='true'] {
+  cursor: pointer;
+}
+
+.tabela tbody tr[data-clicavel='true']:hover {
+  background: var(--color-primary-soft);
+}
+
+@media (max-width: 767px) {
+  .tabela th[data-secondary='true'],
+  .tabela td[data-secondary='true'] {
+    display: none;
+  }
+}

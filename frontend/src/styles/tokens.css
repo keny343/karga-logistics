@@ -1,67 +1,106 @@
 /*
- * Karga is a tool people stare at for a whole shift, not a page they visit once.
- * The palette is therefore low-saturation and dark-neutral, with colour reserved
- * for state: nothing is coloured for decoration, so a coloured pixel always
- * means something. Amber is "waiting on someone", blue is "moving", green is
- * "done", red is "failed".
+ * Karga design tokens. Every visual decision in the app resolves to a value here;
+ * no component invents a colour, a radius or a spacing step.
  *
- * Deliberately unlike FinTrack's mint-and-white finance look: this one is a
- * control room.
+ * The product is an operations tool: a light working surface with a dark sidebar
+ * for navigation, blue for actions, and colour otherwise reserved for state. A
+ * coloured pixel always means something.
  */
 :root {
-  color-scheme: dark;
+  /* Brand and actions */
+  --color-primary: #1d4ed8;
+  --color-primary-dark: #1e3a8a;
+  --color-primary-soft: #eff4ff;
+  --color-secondary: #0284c7;
 
-  /* Surfaces, from the page floor up to raised panels */
-  --surface-0: #0e1116;
-  --surface-1: #151a21;
-  --surface-2: #1c222b;
-  --surface-3: #242c37;
-  --border: #2c3542;
-  --border-strong: #3a4655;
+  /* State. Each maps to a group of order statuses. */
+  --color-success: #16a34a;
+  --color-success-soft: #ecfdf3;
+  --color-warning: #d97706;
+  --color-warning-soft: #fff7ed;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0284c7;
+  --color-info-soft: #eff6ff;
 
-  --text: #e6ebf2;
-  --text-muted: #9aa7b8;
-  --text-faint: #6b7889;
+  /* Neutrals */
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-disabled: #94a3b8;
 
-  /* Karga's own accent: a working slate-blue, not a brand gradient */
-  --accent: #4f8ef7;
-  --accent-strong: #2f6fd8;
-  --accent-soft: rgba(79, 142, 247, 0.14);
+  /* Sidebar has its own scale: it is the one dark surface in the product. */
+  --color-sidebar: #0f172a;
+  --color-sidebar-raised: #1a2436;
+  --color-sidebar-text: #cbd5e1;
+  --color-sidebar-text-muted: #94a3b8;
+  --color-sidebar-active: #1d4ed8;
+  --color-sidebar-active-text: #ffffff;
+  --color-sidebar-border: #1e293b;
 
-  /* State colours. Each maps to a delivery status group. */
-  --state-pending: #d9a13b;
-  --state-pending-soft: rgba(217, 161, 59, 0.15);
-  --state-moving: #4f8ef7;
-  --state-moving-soft: rgba(79, 142, 247, 0.15);
-  --state-done: #35a869;
-  --state-done-soft: rgba(53, 168, 105, 0.15);
-  --state-failed: #d9534f;
-  --state-failed-soft: rgba(217, 83, 79, 0.15);
-  --state-idle: #6b7889;
-  --state-idle-soft: rgba(107, 120, 137, 0.15);
+  /* Typography: one family, a fixed ladder of sizes. */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', ui-monospace, monospace;
 
-  /* Operational density: tables and toolbars, not marketing whitespace */
+  --text-display: 2rem; /* 32/38/700 */
+  --text-display-lh: 2.375rem;
+  --text-page: 1.5rem; /* 24/32/700 */
+  --text-page-lh: 2rem;
+  --text-section: 1.125rem; /* 18/26/600 */
+  --text-section-lh: 1.625rem;
+  --text-card: 0.9375rem; /* 15/22/600 */
+  --text-card-lh: 1.375rem;
+  --text-body: 0.875rem; /* 14/20/400 */
+  --text-body-lh: 1.25rem;
+  --text-small: 0.8125rem; /* 13/18/400 */
+  --text-small-lh: 1.125rem;
+  --text-caption: 0.75rem; /* 12/16/500 */
+  --text-caption-lh: 1rem;
+
+  /* Spacing: 4px scale, 16px is the default step. */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
 
-  --radius: 4px;
-  --radius-lg: 6px;
+  /* Radius: moderate. Nothing in an operations tool is a pill except a badge. */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-card: 8px;
+  --radius-modal: 10px;
+  --radius-pill: 9999px;
 
-  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  /* Codes, coordinates and timestamps line up only in a monospace face. */
-  --font-mono: 'JetBrains Mono', 'Cascadia Mono', ui-monospace, 'Courier New', monospace;
+  /* Shadows are almost invisible: separation comes from borders. */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-dropdown: 0 4px 12px rgba(15, 23, 42, 0.12);
+  --shadow-modal: 0 12px 32px rgba(15, 23, 42, 0.18);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.875rem;
-  --text-lg: 1rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-modal: 400;
+  --z-toast: 500;
 
-  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --focus-ring: 2px solid #7fb0ff;
+  --layout-sidebar: 240px;
+  --layout-header: 64px;
+
+  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.35);
+  --transition: 120ms ease;
 }
+
+/*
+ * Breakpoints exist as documentation only: CSS custom properties cannot be used
+ * in media queries. The values are mobile < 768px, tablet 768-1023px,
+ * desktop >= 1024px, and every media query in the codebase uses them literally.
+ */

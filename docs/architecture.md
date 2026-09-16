@@ -32,6 +32,11 @@ route ──> controller ──> service ──> repository ──> database
 - **repository** — SQL. Every query that touches a business table takes a
   `company_id` and filters on it.
 
+Beside them sits **domain**, which has no dependencies at all: the order state
+machine is a transition table and a function that consults it. It knows nothing
+about Express or `pg`, which is why every ordered pair of statuses can be tested
+without a database.
+
 The direction matters: a service never reads `req`, so its rules are testable
 without an HTTP layer, and a repository never decides policy.
 
@@ -82,6 +87,39 @@ platform keeps sending traffic while it waits.
 takes a company from the client: it comes from the authenticated session. A
 resource belonging to another company answers `404`, not `403`, so an id cannot be
 probed for existence across tenants.
+
+## The state machine
+
+`src/domain/orderStatus.ts` is the only place that says which move is legal. The
+service consults it before writing, the database repeats the parts it can express
+as `CHECK` constraints, and the API returns the allowed moves with every order so
+the interface renders buttons from the domain rather than from a hardcoded list.
+Three enforcement points for one rule, because the cost of an illegal state here
+is a parcel nobody is responsible for.
+
+An order is locked with `SELECT … FOR UPDATE` for the duration of a transition, so
+two operators clicking at once cannot both read `PRONTO` and both write.
+
+## Frontend
+
+```
+main ──> SessionProvider ──> ToastProvider ──> router ──> AppLayout ──> page
+```
+
+- **`ui/`** — the component library. Nothing outside it declares a colour, a
+  radius or a font size; those live in `styles/tokens.css`.
+- **`api/client.ts`** — every request, typed, sending credentials, raising
+  `ApiError` with the server's code and message. No component calls `fetch`.
+- **`hooks/useResource`** — one place that owns loading, empty, error and
+  refreshing. A screen that fetches gets all five states by construction rather
+  than by remembering.
+- **`auth/SessionContext`** — asks `/api/auth/me` once at boot; the router waits
+  for that answer instead of flashing the login screen at a signed-in user.
+- **`domain/orderStatus.ts`** — status labels and their semantic tone, so the same
+  status is never green on one screen and blue on another.
+
+Route guards are convenience. The interface hides what a role may not do; the API
+refuses it regardless.
 
 ## Testing strategy
 

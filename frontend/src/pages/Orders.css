@@ -1,0 +1,53 @@
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12rem auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.filtros__busca {
+  min-width: 0;
+}
+
+.filtros__accao {
+  padding-bottom: 1px;
+}
+
+.celula-codigo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The link carries the row's keyboard path, so it must be focusable and visible
+ * as a target, but it should not turn the column into a wall of blue. */
+.celula-codigo__link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.celula-codigo__link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.celula-codigo__link:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}
+
+/* A refresh dims the table slightly instead of replacing it with a skeleton. */
+.tabela-area[data-refreshing='true'] {
+  opacity: 0.6;
+  transition: opacity var(--transition);
+}
+
+@media (max-width: 767px) {
+  .filtros {
+    grid-template-columns: 1fr;
+  }
+}

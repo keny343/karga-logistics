@@ -52,12 +52,21 @@ describe('readiness', () => {
 });
 
 describe('error envelope', () => {
+  // Anonymously, an unknown path under /api answers 401 rather than 404: the
+  // session check sits in front of the whole router, so an outsider cannot map
+  // which routes exist. `/health` is public and unrouted below it.
   it('answers an unknown route with the documented shape', async () => {
-    const res = await request(app).get('/api/nao-existe');
+    const res = await request(app).get('/health/nao-existe');
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
     expect(typeof res.body.error.message).toBe('string');
     expect(res.body.error.requestId).toBeDefined();
+  });
+
+  it('does not disclose which api routes exist to an anonymous caller', async () => {
+    const res = await request(app).get('/api/nao-existe');
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHENTICATED');
   });
 
   it('answers malformed JSON with JSON, not an HTML error page', async () => {

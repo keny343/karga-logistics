@@ -28,6 +28,12 @@ and never referenced by an API path.
 **Time.** Every timestamp is `timestamptz`. The database stores UTC; formatting to
 Angolan local time happens at the edge.
 
+Aggregates that count a *day* say which day they mean:
+`date_trunc('day', now() AT TIME ZONE 'Africa/Luanda')`. Left to the session's
+configured zone, "orders today" would be a UTC day — and for the hour before
+midnight in Luanda the dashboard would report zero while the day's parcels were
+already out. Angola has never used daylight saving, so the boundary is stable.
+
 **Money and weight.** Integers only — value in cêntimos, weight in grams. A float
 that represents money eventually loses a cêntimo, and the loss is only found when
 a total disagrees.
@@ -42,7 +48,7 @@ comparisons in phase 5 use a bounding box plus haversine, which is exact enough 
 refers to a person survives that person's account, so `audit_logs.actor_id` is
 nullable with `ON DELETE SET NULL` and carries a text label copied at write time.
 
-## Tables today (phase 1)
+## Tables today
 
 | Table | Purpose |
 |-------|---------|
@@ -50,6 +56,12 @@ nullable with `ON DELETE SET NULL` and carries a text label copied at write time
 | `users` | Accounts with a role, unique per company by email. |
 | `audit_logs` | Append-only record of sensitive actions. |
 | `schema_migrations` | Which migrations ran, and their checksums. |
+| `sessions` | Live sessions, token stored only as a SHA-256 hash. |
+| `login_attempts` | Failed and successful logins, for throttling. |
+| `customers` | Who the parcel is for, with their default address. |
+| `drivers` | Who carries it, their vehicle and availability. |
+| `orders` | The parcel, its two addresses and its current status. |
+| `order_status_history` | Every accepted transition, with actor and note. |
 
 `user_role` is an enum (`ADMIN`, `OPERADOR`, `MOTORISTA`, `CLIENTE`). Four values
 the code branches on belong in the type system rather than in a table someone can
@@ -57,6 +69,23 @@ edit into a state the code cannot handle.
 
 Email is unique **per company**, not globally: the same person may drive for two
 carriers, and one carrier must not be able to learn who exists at another.
+
+`order_status` has thirteen values, `driver_status` three and `vehicle_type` four,
+for the same reason.
+
+**Addresses are columns, not a table.** `customers` carries the default address;
+`orders` carries origin and destination copied at creation. A foreign key to an
+editable address row would let a customer moving house rewrite where last month's
+delivery went. A snapshot cannot be corrected retroactively, which is the point.
+
+**Order codes come from one sequence** (`order_code_seq`) for the whole
+installation, not per company. Two carriers would otherwise both have a
+`KRG-000001`, and a public tracking link has nothing else to distinguish them.
+
+**One driver, one parcel.** A partial unique index on
+`orders (driver_id) WHERE status IN ('ATRIBUIDO','RECOLHIDO','EM_ENTREGA')` makes
+double assignment impossible at the storage layer, so a race between two operators
+cannot produce it even if the service check passes for both.
 
 ## Indexing
 

@@ -1,7 +1,9 @@
+import type { DriverStatus, OrderStatus } from '../domain/orderStatus';
+
 /**
  * One place that knows how to talk to the API. Errors arrive in the envelope the
- * backend promises ({ error: { code, message, requestId } }), so the UI can show
- * a real message and quote the request id instead of saying "something failed".
+ * backend promises, so a screen can show a real message and quote the request id
+ * instead of saying "something failed".
  */
 export interface ApiErrorBody {
   error: {
@@ -68,12 +70,173 @@ export const request = async <T>(caminho: string, init: RequestInit = {}): Promi
   return corpo as T;
 };
 
-export interface Health {
-  status: string;
-  service: string;
-  uptimeSeconds: number;
+const enviar = <T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> =>
+  request<T>(caminho, {
+    method: metodo,
+    ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}),
+  });
+
+const comFiltros = (caminho: string, filtros: Record<string, string | number | undefined>): string => {
+  const params = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(filtros)) {
+    if (valor !== undefined && valor !== '') params.set(chave, String(valor));
+  }
+  const query = params.toString();
+  return query.length > 0 ? `${caminho}?${query}` : caminho;
+};
+
+// ---------------------------------------------------------------- types
+
+export type Role = 'ADMIN' | 'OPERADOR' | 'MOTORISTA' | 'CLIENTE';
+
+export interface User {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly role: Role;
+  readonly companyId: string;
+  readonly companyName: string;
 }
 
+export interface Endereco {
+  readonly description: string;
+  readonly province: string;
+  readonly municipality: string;
+  readonly locality?: string;
+  readonly reference?: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+}
+
+export interface Customer {
+  readonly id: string;
+  readonly name: string;
+  readonly phone: string;
+  readonly email?: string;
+  readonly address: Endereco;
+  readonly ordersCount?: number;
+  readonly isActive: boolean;
+  readonly createdAt: string;
+}
+
+export interface Driver {
+  readonly id: string;
+  readonly name: string;
+  readonly phone: string;
+  readonly documentId?: string;
+  readonly status: DriverStatus;
+  readonly vehicleType?: 'MOTA' | 'CARRO' | 'CARRINHA';
+  readonly vehiclePlate?: string;
+  readonly activeOrders: number;
+  readonly deliveredCount: number;
+  readonly isActive: boolean;
+}
+
+export interface OrderHistoryEntry {
+  readonly status: OrderStatus;
+  readonly at: string;
+  readonly by: string;
+  readonly note?: string;
+}
+
+export interface OrderSummary {
+  readonly id: string;
+  readonly code: string;
+  readonly status: OrderStatus;
+  readonly customerName: string;
+  readonly driverName?: string;
+  readonly destination: string;
+  readonly valueCents: number;
+  readonly createdAt: string;
+  readonly expectedAt?: string;
+  readonly late: boolean;
+}
+
+export interface Order extends OrderSummary {
+  readonly customerId: string;
+  readonly driverId?: string;
+  readonly origin: Endereco;
+  readonly destinationAddress: Endereco;
+  readonly description: string;
+  readonly weightGrams: number;
+  readonly notes?: string;
+  readonly completedAt?: string;
+  readonly history: readonly OrderHistoryEntry[];
+  readonly allowedTransitions: readonly OrderStatus[];
+}
+
+export interface Pagina<T> {
+  readonly items: readonly T[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+export interface DashboardResumo {
+  readonly ordersToday: number;
+  readonly inDelivery: number;
+  readonly delivered: number;
+  readonly failed: number;
+  readonly late: number;
+  readonly activeDrivers: number;
+  readonly byStatus: readonly { readonly status: OrderStatus; readonly count: number }[];
+  readonly perDay: readonly { readonly day: string; readonly count: number }[];
+  readonly recent: readonly OrderSummary[];
+}
+
+export interface NovaEncomenda {
+  readonly customerId: string;
+  readonly description: string;
+  readonly weightGrams: number;
+  readonly valueCents: number;
+  readonly origin: Endereco;
+  readonly destination: Endereco;
+  readonly expectedAt?: string;
+  readonly notes?: string;
+}
+
+// ---------------------------------------------------------------- endpoints
+
 export const api = {
-  health: () => request<Health>('/health'),
+  health: () => request<{ status: string; service: string; uptimeSeconds: number }>('/health'),
+
+  login: (email: string, password: string) =>
+    enviar<{ user: User }>('POST', '/api/auth/login', { email, password }),
+  logout: () => enviar<{ ok: true }>('POST', '/api/auth/logout'),
+  me: () => request<{ user: User | null }>('/api/auth/me'),
+
+  dashboard: () => request<DashboardResumo>('/api/dashboard'),
+
+  orders: (filtros: { status?: string; search?: string; driverId?: string; page?: number }) =>
+    request<Pagina<OrderSummary>>(comFiltros('/api/orders', filtros)),
+  order: (id: string) => request<{ order: Order }>(`/api/orders/${id}`),
+  createOrder: (dados: NovaEncomenda) => enviar<{ order: Order }>('POST', '/api/orders', dados),
+  assignOrder: (id: string, driverId: string) =>
+    enviar<{ order: Order }>('POST', `/api/orders/${id}/assign`, { driverId }),
+  changeStatus: (id: string, status: OrderStatus, note?: string) =>
+    enviar<{ order: Order }>('POST', `/api/orders/${id}/status`, {
+      status,
+      ...(note !== undefined && note !== '' ? { note } : {}),
+    }),
+
+  customers: (filtros: { search?: string; page?: number }) =>
+    request<Pagina<Customer>>(comFiltros('/api/customers', filtros)),
+  createCustomer: (dados: {
+    name: string;
+    phone: string;
+    email?: string;
+    address: Endereco;
+  }) => enviar<{ customer: Customer }>('POST', '/api/customers', dados),
+
+  drivers: (filtros: { status?: string; search?: string; page?: number } = {}) =>
+    request<Pagina<Driver>>(comFiltros('/api/drivers', filtros)),
+  createDriver: (dados: {
+    name: string;
+    phone: string;
+    documentId?: string;
+    vehicleType?: string;
+    vehiclePlate?: string;
+  }) => enviar<{ driver: Driver }>('POST', '/api/drivers', dados),
+  setDriverStatus: (id: string, status: DriverStatus) =>
+    enviar<{ driver: Driver }>('PATCH', `/api/drivers/${id}`, { status }),
 };
