@@ -47,6 +47,12 @@ authenticated session and never from the request body or query string.
 A resource that belongs to another company answers **404, not 403**. `403` confirms
 that the id exists, which is itself information a tenant should not have.
 
+The claim is tested where it is easiest to break: `backend/tests/jornada.test.ts` runs
+a whole working afternoon with a rival carrier's operator and an uninvolved driver
+signed in and connected throughout, recording every event they receive, and ends by
+asserting the recordings are empty. Isolation that is only tested one client at a time
+is not tested at all — the leak needs somebody else online to leak to.
+
 ## Authentication
 
 **Passwords hashed with bcrypt at cost 12.** The test suite drops to the minimum

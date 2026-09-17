@@ -77,6 +77,65 @@ export const ligarCliente = (
     });
   });
 
+/**
+ * Everything one browser was told, for as long as it stays connected.
+ *
+ * A journey test needs both halves of the question: what each person was told, and what
+ * nobody told them. Waiting for an event proves the first; only a recording that was
+ * listening the whole time proves the second.
+ */
+export interface Gravador {
+  /** Every event received, in order. */
+  readonly tudo: readonly { evento: string; dados: unknown }[];
+  /** The payloads of one event, in order. */
+  de: <T>(evento: string) => T[];
+  quantos: (evento: string) => number;
+  /** Waits until the predicate holds over what has arrived, or gives up. */
+  ate: (
+    descricao: string,
+    condicao: (gravador: Gravador) => boolean,
+    timeoutMs?: number,
+  ) => Promise<void>;
+}
+
+const EVENTOS = ['encomenda:actualizada', 'motorista:posicao', 'aviso', 'sessao:terminada'] as const;
+
+export const gravar = (socket: SocketCliente): Gravador => {
+  const recebidos: { evento: string; dados: unknown }[] = [];
+
+  for (const evento of EVENTOS) {
+    socket.on(evento, (dados: unknown) => {
+      recebidos.push({ evento, dados });
+    });
+  }
+
+  const gravador: Gravador = {
+    tudo: recebidos,
+    de: <T,>(evento: string) =>
+      recebidos.filter((linha) => linha.evento === evento).map((linha) => linha.dados as T),
+    quantos: (evento) => recebidos.filter((linha) => linha.evento === evento).length,
+    ate: async (descricao, condicao, timeoutMs = 3_000) => {
+      const limite = Date.now() + timeoutMs;
+      while (!condicao(gravador)) {
+        if (Date.now() > limite) {
+          const chegaram = recebidos.map((linha) => linha.evento).join(', ');
+          throw new Error(`esgotou a espera por ${descricao}. Chegou: [${chegaram}]`);
+        }
+        await new Promise((resolver) => setTimeout(resolver, 25));
+      }
+    },
+  };
+
+  return gravador;
+};
+
+/**
+ * Long enough for anything already in flight to have arrived. Used before asserting that
+ * somebody was told nothing: absence needs a moment to mean anything.
+ */
+export const assentar = (ms = 350): Promise<void> =>
+  new Promise((resolver) => setTimeout(resolver, ms));
+
 /** Waits for one event, or gives up. Used for "this must arrive". */
 export const esperarEvento = <T>(
   socket: SocketCliente,

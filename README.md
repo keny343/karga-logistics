@@ -123,7 +123,7 @@ docker compose up
 ## Tests
 
 ```bash
-cd backend  && npm test    # 147 tests
+cd backend  && npm test    # 149 tests
 cd frontend && npm test    # 61 tests
 ```
 
@@ -145,6 +145,16 @@ would exercise. They assert the things that would be quiet failures: that a sock
 no session is refused, that an event never crosses into another company, that one driver
 never sees another, that a position from a browser is validated and rate limited, and
 that logging out closes the sockets left open elsewhere.
+
+`tests/jornada.test.ts` plays one working afternoon with all six people signed in at
+once: an operator dispatches, a driver reports in from the road, the first delivery
+attempt fails and the second works, a customer follows her parcel and an admin closes
+the books. Two kinds of bug are only reachable this way. A leak between people who are
+online together — a rival carrier's operator and a second driver stay connected from
+the first line to the last, recording everything, and the test ends by asserting they
+were told nothing. And a story that stops making sense halfway: each step asserts
+against what the last one produced, so a change that breaks the chain between two
+features fails here even when both still pass their own tests.
 
 The frontend suite covers the screens' loading, empty and error states against a stubbed
 API, tests the map by what it asks Leaflet to draw rather than by rendering tiles, and
