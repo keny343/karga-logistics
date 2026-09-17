@@ -128,6 +128,40 @@ rows and carries the count in `X-Row-Count`. Every export is recorded in the aud
 trail with the window and the number of rows, because it takes customer names and
 phone numbers out of the system.
 
+## Map
+
+| Method | Path | Roles |
+|--------|------|-------|
+| GET | `/api/map/operation` | any, narrowed by role |
+| PATCH | `/api/orders/:id/coordinates` | ADMIN, OPERADOR |
+
+`operation` returns everything one map draws: `items`, the open orders that have a
+destination point; `origins`, the distinct pickup points they leave from; and
+`withoutCoordinates`, the open orders it **cannot** draw. That last list is the
+reason this is not the order list with a filter — a map silently omitting three
+parcels is worse than a map that says so, because the dispatcher counts markers and
+believes them. It also carries `center` (Luanda), so a map with nothing to show does
+not open on the middle of the Atlantic and look broken.
+
+Only open orders are returned. A parcel delivered last month is noise covering the
+one being looked for. The scope comes from the session: a driver gets the parcel he
+is carrying, a customer the orders placed for them, an operator the company. A
+driver account with no driver row gets an empty map, never the company's.
+
+`PATCH /api/orders/:id/coordinates` takes `{ latitude, longitude }` and moves the
+destination point only — the written address is untouched, because "quiosque 12, em
+frente ao Talatona Imperial" is how somebody actually finds the place and a map click
+cannot improve on it. Coordinates are set by hand rather than geocoded for the same
+reason: most addresses here are a description and a landmark, which no geocoder
+resolves.
+
+Two refusals are worth knowing. A pair that would be inside Angola if the numbers
+were exchanged answers `400` naming the mistake and suggesting the corrected pair,
+because `13.23, -8.83` is a valid point in the Atlantic and looks plausible on a
+zoomed-in map. And a finished order answers `409`: where a delivery went is history,
+which is why addresses are snapshots on the row rather than a foreign key. Every
+change is recorded in the audit trail with the point.
+
 ## Customers
 
 | Method | Path | Roles |
@@ -153,5 +187,5 @@ parcel answers `409`: the parcel would be left with nobody responsible for it.
 
 ## Planned
 
-Addresses and the operational map (phase 5), Socket.IO events (phase 6), proof of
-delivery uploads (phase 7).
+Socket.IO events for live driver positions (phase 6), proof of delivery uploads
+(phase 7).

@@ -229,6 +229,39 @@ export interface Relatorio {
   }[];
 }
 
+export interface PontoMapa {
+  readonly id: string;
+  readonly code: string;
+  readonly status: OrderStatus;
+  readonly customerName: string;
+  readonly driverName?: string;
+  readonly municipality: string;
+  readonly description: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly late: boolean;
+}
+
+export interface MapaOperacao {
+  readonly items: readonly PontoMapa[];
+  readonly origins: readonly {
+    readonly description: string;
+    readonly municipality: string;
+    readonly latitude: number;
+    readonly longitude: number;
+  }[];
+  /** Open orders the map cannot draw. Returned so they are not silently missing. */
+  readonly withoutCoordinates: readonly {
+    readonly id: string;
+    readonly code: string;
+    readonly status: OrderStatus;
+    readonly customerName: string;
+    readonly municipality: string;
+    readonly description: string;
+  }[];
+  readonly center: { readonly latitude: number; readonly longitude: number };
+}
+
 export interface NovaEncomenda {
   readonly customerId: string;
   readonly description: string;
@@ -269,6 +302,10 @@ export const api = {
       status,
       ...(note !== undefined && note !== '' ? { note } : {}),
     }),
+
+  map: () => request<MapaOperacao>('/api/map/operation'),
+  setOrderCoordinates: (id: string, ponto: { latitude: number; longitude: number }) =>
+    enviar<{ order: Order }>('PATCH', `/api/orders/${id}/coordinates`, ponto),
 
   customers: (filtros: { search?: string; page?: number }) =>
     request<Pagina<Customer>>(comFiltros('/api/customers', filtros)),

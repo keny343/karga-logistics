@@ -13,6 +13,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -24,6 +25,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^22.20.3",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",

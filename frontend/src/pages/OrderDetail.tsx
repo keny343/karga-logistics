@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Package, Truck, User } from 'lucide-react';
 import { ApiError, api, type Driver, type Order } from '../api/client';
 import {
+  ESTADOS_FINAIS,
   TIMELINE_PRINCIPAL,
   statusLabel,
   type OrderStatus,
@@ -20,6 +21,11 @@ import { ErrorState, LoadingState } from '../ui/States';
 import { useToast } from '../ui/Toast';
 import { formatDateTime, formatKg, formatKz, formatTelefone } from '../utils/format';
 import './OrderDetail.css';
+
+/** Same reason as the map screen: Leaflet arrives only when a map is on screen. */
+const DestinoNoMapa = lazy(() =>
+  import('./DestinoNoMapa').then((modulo) => ({ default: modulo.DestinoNoMapa })),
+);
 
 /**
  * The timeline shows the standard path with the steps already taken marked, and
@@ -196,6 +202,16 @@ export const OrderDetail = () => {
           <Card title="Percurso">
             <Timeline steps={construirTimeline(encomenda)} />
           </Card>
+
+          <Suspense fallback={null}>
+            <DestinoNoMapa
+              encomenda={encomenda}
+              // A finished order's destination is history: the API refuses to move
+              // it, so the interface does not offer to.
+              podeEditar={podeOperar && !ESTADOS_FINAIS.includes(encomenda.status)}
+              onGuardado={reload}
+            />
+          </Suspense>
         </div>
 
         <div className="detalhe__coluna">

@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SessionProvider, useSession } from './auth/SessionContext';
 import { AppLayout } from './layout/AppLayout';
@@ -37,6 +38,15 @@ const Protegida = ({
 
   return <>{children}</>;
 };
+
+/**
+ * The map is loaded on demand. Leaflet and its stylesheet are a third of the
+ * application's weight, and they are needed by one screen — a driver opening the
+ * order list on a phone should not pay for a map he did not ask for.
+ */
+const MapaOperacional = lazy(() =>
+  import('./pages/MapaOperacional').then((modulo) => ({ default: modulo.MapaOperacional })),
+);
 
 const OPERACAO: readonly Role[] = ['ADMIN', 'OPERADOR'];
 
@@ -82,6 +92,14 @@ export const App = () => (
               <Protegida roles={OPERACAO}>
                 <Drivers />
               </Protegida>
+            }
+          />
+          <Route
+            path="mapa"
+            element={
+              <Suspense fallback={<LoadingState rows={4} />}>
+                <MapaOperacional />
+              </Suspense>
             }
           />
           <Route

@@ -46,7 +46,9 @@ export const NAVEGACAO: readonly GrupoNav[] = [
     items: [
       { to: '/motoristas', label: 'Motoristas', icon: Truck, roles: OPERACAO },
       { to: '/clientes', label: 'Clientes', icon: Users, roles: OPERACAO },
-      { to: '/mapa', label: 'Mapa', icon: Map, roles: OPERACAO, pending: true },
+      // The map narrows itself by session, so a driver seeing only his own parcel on
+      // it is useful rather than a leak.
+      { to: '/mapa', label: 'Mapa', icon: Map, roles: TODOS },
       { to: '/rastreio', label: 'Rastreamento', icon: Search, roles: TODOS, pending: true },
     ],
   },

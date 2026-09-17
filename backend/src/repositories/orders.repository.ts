@@ -320,6 +320,24 @@ export const definirMotorista = async (
   );
 };
 
+/**
+ * Refines where a parcel is going. Only the destination point moves: the written
+ * address is what the customer gave and what the driver reads, and replacing it
+ * from a map click would lose the reference that gets somebody to the right gate.
+ */
+export const definirCoordenadasDestino = async (
+  companyId: string,
+  orderId: string,
+  ponto: { latitude: number; longitude: number },
+): Promise<void> => {
+  await query(
+    `UPDATE orders
+        SET dest_latitude = $3, dest_longitude = $4, updated_at = now()
+      WHERE company_id = $1 AND id = $2`,
+    [companyId, orderId, ponto.latitude, ponto.longitude],
+  );
+};
+
 /** The invariant behind "este motorista já tem uma entrega activa". */
 export const contarActivasDoMotorista = async (
   client: PoolClient,

@@ -47,6 +47,12 @@ const MAPA: Record<OrderStatus, Descricao> = {
 export const statusLabel = (status: OrderStatus): string => MAPA[status].label;
 export const statusTone = (status: OrderStatus): Tone => MAPA[status].tone;
 
+/**
+ * States an order does not move out of. The backend enforces this; the interface
+ * uses it to avoid offering an action the API would refuse.
+ */
+export const ESTADOS_FINAIS: readonly OrderStatus[] = ['ENTREGUE', 'CANCELADO', 'DEVOLVIDO'];
+
 /** The order in which statuses appear on a tracking timeline. */
 export const TIMELINE_PRINCIPAL: readonly OrderStatus[] = [
   'CRIADO',

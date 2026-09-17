@@ -101,6 +101,29 @@ caller write header content.
 **Every export is audited** with the window and the row count. Data leaving the
 system is exactly what an audit trail is for.
 
+## The map
+
+**Third-party tiles see the viewport, not the data.** Tiles come from
+OpenStreetMap, so the browser tells `tile.openstreetmap.org` which area is being
+looked at. It never sends order codes, customer names or coordinates — those come
+from this API and are drawn locally on top. The attribution the licence requires is
+part of the map and is not removed.
+
+**A popup is HTML, so every value going into one is escaped.** Leaflet popups live
+outside React's tree, which means React's escaping does not apply. Customer names,
+addresses and municipalities are escaped before they are interpolated, because they
+were typed into a form.
+
+**The map's scope is the session's scope.** It is the same resolution the order list
+uses, in one place so the two cannot disagree: a driver sees the parcel he carries, a
+customer the orders placed for them. A driver account with no driver row gets an
+empty map rather than the company's — a missing link fails closed.
+
+**A finished order's destination cannot be moved.** Coordinates are part of the
+address snapshot on the row; letting a map click change them after delivery would
+rewrite where a parcel actually went. Every accepted change is audited with the
+point.
+
 ## Phase 7 (uploads)
 
 Proof-of-delivery photos will be validated on MIME type, extension, size and
@@ -117,7 +140,8 @@ and survive the deletion of the account that caused them.
 Recorded today: `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `ORDER_CREATED`,
 `ORDER_ASSIGNED`, `DELIVERY_PICKED_UP`, `DELIVERY_STARTED`, `DELIVERY_COMPLETED`,
 `DELIVERY_FAILED`, `ORDER_CANCELLED`, `ORDER_RETURNED`, `CUSTOMER_CREATED`,
-`DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`, `REPORT_EXPORTED`.
+`DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`, `REPORT_EXPORTED`,
+`ORDER_COORDINATES_SET`.
 
 A failed audit write never fails the request: by then the action has already
 succeeded, and refusing it afterwards would be worse than a missing row. The

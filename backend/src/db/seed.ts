@@ -96,6 +96,12 @@ const GUIOES: readonly {
   readonly horasAtras: number;
   readonly prazoHoras?: number;
   readonly nota?: string;
+  /**
+   * Left off the map on purpose. A new address that nobody has pinned yet is the
+   * normal case in Luanda, and it is the only way the panel listing what the map
+   * cannot draw is ever seen in a demonstration.
+   */
+  readonly semPonto?: boolean;
 }[] = [
   { cliente: 0, descricao: 'Caixa de medicamentos refrigerados', kg: 6.5, kz: 185000, caminho: ['CONFIRMADO', 'PREPARANDO', 'PRONTO', 'ATRIBUIDO', 'RECOLHIDO', 'EM_ENTREGA', 'ENTREGUE'], motorista: 1, horasAtras: 52, prazoHoras: 48 },
   { cliente: 1, descricao: 'Duas grades de bebidas', kg: 24, kz: 96000, caminho: ['CONFIRMADO', 'PREPARANDO', 'PRONTO', 'ATRIBUIDO', 'RECOLHIDO', 'EM_ENTREGA', 'ENTREGUE'], motorista: 2, horasAtras: 30, prazoHoras: 24 },
@@ -106,7 +112,7 @@ const GUIOES: readonly {
   { cliente: 1, descricao: 'Sacos de arroz 25 kg', kg: 50, kz: 210000, caminho: ['CONFIRMADO', 'PREPARANDO'], horasAtras: 4, prazoHoras: 20 },
   { cliente: 4, descricao: 'Consumíveis de laboratório', kg: 7, kz: 158000, caminho: ['CONFIRMADO'], horasAtras: 2, prazoHoras: 30 },
   { cliente: 2, descricao: 'Documentos e contratos', kg: 0.4, kz: 15000, caminho: [], horasAtras: 1, prazoHoras: 26 },
-  { cliente: 3, descricao: 'Grelhador industrial', kg: 46, kz: 890000, caminho: [], horasAtras: 0.5, prazoHoras: 40 },
+  { cliente: 3, descricao: 'Grelhador industrial', kg: 46, kz: 890000, caminho: [], horasAtras: 0.5, prazoHoras: 40, semPonto: true },
   {
     cliente: 1,
     descricao: 'Encomenda mista — mercearia',
@@ -257,8 +263,8 @@ const seed = async (): Promise<void> => {
           cliente.description,
           cliente.municipality,
           cliente.reference ?? null,
-          cliente.latitude,
-          cliente.longitude,
+          guiao.semPonto === true ? null : cliente.latitude,
+          guiao.semPonto === true ? null : cliente.longitude,
           guiao.prazoHoras !== undefined ? horasAFrente(criadaEm, guiao.prazoHoras) : null,
           guiao.nota ?? null,
           operadorId,

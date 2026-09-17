@@ -1,0 +1,95 @@
+.mapa-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mapa-barra {
+  display: grid;
+  grid-template-columns: 16rem auto 1fr;
+  align-items: end;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mapa-barra__contagem {
+  font-size: var(--text-small);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  padding-bottom: var(--space-2);
+}
+
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 0 var(--space-2);
+  list-style: none;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.legenda li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legenda__cor {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+
+.legenda__cor[data-tone='info'] {
+  background: var(--color-info);
+}
+
+.legenda__cor[data-tone='success'] {
+  background: var(--color-success);
+}
+
+.legenda__cor[data-tone='warning'] {
+  background: var(--color-warning);
+}
+
+.legenda__cor[data-tone='danger'] {
+  background: var(--color-danger);
+}
+
+/* Matches the pin: a pickup point is square and dark, not a coloured dot. */
+.legenda__cor[data-kind='origem'] {
+  background: var(--color-sidebar);
+  border-radius: 2px;
+}
+
+.mapa-pagina__vazio {
+  padding: var(--space-6) var(--space-4);
+}
+
+.mapa-aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 1023px) {
+  .mapa-barra {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .legenda {
+    justify-content: flex-start;
+    padding-bottom: 0;
+  }
+
+  .mapa-barra__contagem {
+    padding-bottom: 0;
+  }
+}

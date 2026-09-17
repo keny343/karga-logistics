@@ -4,6 +4,7 @@ import * as auth from '../controllers/auth.controller.js';
 import * as clientes from '../controllers/customers.controller.js';
 import * as dashboard from '../controllers/dashboard.controller.js';
 import * as motoristas from '../controllers/drivers.controller.js';
+import * as mapa from '../controllers/map.controller.js';
 import * as encomendas from '../controllers/orders.controller.js';
 import * as relatorios from '../controllers/reports.controller.js';
 import { requerAutenticacao, requerPapel } from '../middleware/authenticate.js';
@@ -48,8 +49,8 @@ const limiteLogin = rateLimit({
 apiRouter.get('/', (_req, res) => {
   res.json({
     service: 'karga-api',
-    version: '0.4.0',
-    resources: ['auth', 'dashboard', 'orders', 'customers', 'drivers', 'reports'],
+    version: '0.5.0',
+    resources: ['auth', 'dashboard', 'orders', 'customers', 'drivers', 'reports', 'map'],
   });
 });
 
@@ -77,6 +78,12 @@ apiRouter.post(
   requerPapel('ADMIN', 'OPERADOR', 'MOTORISTA'),
   rota(encomendas.mudarEstado),
 );
+apiRouter.patch('/orders/:id/coordinates', operacao, rota(encomendas.definirCoordenadas));
+
+// -------------------------------------------------------------------- mapa
+// Open to every role: each one gets the slice its session allows, resolved from the
+// session rather than from the request.
+apiRouter.get('/map/operation', rota(mapa.operacao));
 
 // --------------------------------------------------------------- clientes
 apiRouter.get('/customers', operacao, rota(clientes.listar));

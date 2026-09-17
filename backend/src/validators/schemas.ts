@@ -72,6 +72,16 @@ export const atribuicaoSchema = z.object({
   driverId: z.string().uuid('Motorista inválido.'),
 });
 
+/**
+ * The shape only. Whether the point is somewhere a parcel in Angola could go is a
+ * domain question, answered in `domain/geografia.ts`, because the reason a swapped
+ * pair is wrong is geography rather than syntax.
+ */
+export const coordenadasSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
 export const idSchema = z.string().uuid('Identificador inválido.');
 
 const DIA = /^\d{4}-\d{2}-\d{2}$/;

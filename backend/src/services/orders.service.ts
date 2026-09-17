@@ -1,4 +1,5 @@
 import { transaction } from '../config/database.js';
+import { assegurarPontoEmAngola, type Ponto } from '../domain/geografia.js';
 import { assegurarTransicao, isFinal, type OrderStatus } from '../domain/orderStatus.js';
 import * as motoristas from '../repositories/drivers.repository.js';
 import * as encomendas from '../repositories/orders.repository.js';
@@ -120,6 +121,48 @@ export const atribuirMotorista = async (
     resourceType: 'order',
     resourceId: orderId,
     metadata: { driverId, driverName: motorista.name },
+    ip: contexto.ip,
+    requestId: contexto.requestId,
+  });
+
+  return detalhe(companyId, orderId);
+};
+
+/**
+ * Puts a parcel on the map. Coordinates are refined after the fact because an
+ * address in Luanda is often a description and a landmark, not something a geocoder
+ * resolves — the operator who knows the place drops the pin.
+ */
+export const definirCoordenadas = async (
+  contexto: Contexto,
+  orderId: string,
+  ponto: Ponto,
+) => {
+  const companyId = contexto.auth.companyId;
+  const linha = await encomendaOuNada(companyId, orderId);
+
+  assegurarPontoEmAngola(ponto);
+
+  // A finished order's destination is history. Moving the pin afterwards would
+  // rewrite where a delivery actually went, which is the reason addresses are
+  // snapshots on the row in the first place.
+  if (isFinal(linha.status)) {
+    throw new AppError(
+      'CONFLICT',
+      `A encomenda ${linha.code} está em ${linha.status} e o destino já não pode ser alterado.`,
+    );
+  }
+
+  await encomendas.definirCoordenadasDestino(companyId, orderId, ponto);
+
+  await registarAuditoria({
+    companyId,
+    actorId: contexto.auth.userId,
+    actorLabel: contexto.auth.email,
+    action: 'ORDER_COORDINATES_SET',
+    resourceType: 'order',
+    resourceId: orderId,
+    metadata: { latitude: ponto.latitude, longitude: ponto.longitude },
     ip: contexto.ip,
     requestId: contexto.requestId,
   });

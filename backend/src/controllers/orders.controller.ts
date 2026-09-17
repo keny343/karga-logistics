@@ -4,10 +4,12 @@ import { empresaDe } from '../middleware/authenticate.js';
 import * as motoristas from '../repositories/drivers.repository.js';
 import * as repo from '../repositories/orders.repository.js';
 import * as servico from '../services/orders.service.js';
+import { ambitoDe } from '../services/ambito.service.js';
 import { query } from '../config/database.js';
 import { AppError } from '../utils/errors.js';
 import {
   atribuicaoSchema,
+  coordenadasSchema,
   encomendaSchema,
   filtrosSchema,
   idSchema,
@@ -19,40 +21,9 @@ const contextoDe = (req: Request): servico.Contexto => {
   return { auth: req.auth, requestId: req.requestId, ip: req.ip ?? null };
 };
 
-/**
- * Roles see different slices of the same list. A driver sees the parcels he is
- * carrying, a customer sees the orders placed for them, an operator sees the
- * company. None of this comes from the query string.
- */
-const restricaoPorPapel = async (
-  req: Request,
-): Promise<{ driverId?: string; customerId?: string } | 'vazio'> => {
-  if (req.auth === undefined) return 'vazio';
-
-  if (req.auth.role === 'MOTORISTA') {
-    const { rows } = await query<{ id: string }>(
-      'SELECT id FROM drivers WHERE company_id = $1 AND user_id = $2 AND is_active',
-      [req.auth.companyId, req.auth.userId],
-    );
-    const motorista = rows[0];
-    return motorista === undefined ? 'vazio' : { driverId: motorista.id };
-  }
-
-  if (req.auth.role === 'CLIENTE') {
-    const { rows } = await query<{ id: string }>(
-      'SELECT id FROM customers WHERE company_id = $1 AND user_id = $2 AND is_active',
-      [req.auth.companyId, req.auth.userId],
-    );
-    const cliente = rows[0];
-    return cliente === undefined ? 'vazio' : { customerId: cliente.id };
-  }
-
-  return {};
-};
-
 export const listar = async (req: Request, res: Response): Promise<void> => {
   const filtros = filtrosSchema.parse(req.query);
-  const restricao = await restricaoPorPapel(req);
+  const restricao = await ambitoDe(req.auth);
 
   if (restricao === 'vazio') {
     res.json({ items: [], total: 0, page: filtros.page, pageSize: filtros.pageSize });
@@ -92,7 +63,7 @@ export const obter = async (req: Request, res: Response): Promise<void> => {
   const id = idSchema.parse(req.params.id);
   const encomenda = await servico.detalhe(empresaDe(req), id);
 
-  const restricao = await restricaoPorPapel(req);
+  const restricao = await ambitoDe(req.auth);
   if (restricao === 'vazio') throw new AppError('NOT_FOUND', 'Encomenda não encontrada.');
   if (restricao.driverId !== undefined && encomenda.driverId !== restricao.driverId) {
     throw new AppError('NOT_FOUND', 'Encomenda não encontrada.');
@@ -134,6 +105,13 @@ export const atribuir = async (req: Request, res: Response): Promise<void> => {
   const id = idSchema.parse(req.params.id);
   const { driverId } = atribuicaoSchema.parse(req.body);
   const encomenda = await servico.atribuirMotorista(contextoDe(req), id, driverId);
+  res.json({ order: encomenda });
+};
+
+export const definirCoordenadas = async (req: Request, res: Response): Promise<void> => {
+  const id = idSchema.parse(req.params.id);
+  const ponto = coordenadasSchema.parse(req.body);
+  const encomenda = await servico.definirCoordenadas(contextoDe(req), id, ponto);
   res.json({ order: encomenda });
 };
 

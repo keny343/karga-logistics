@@ -3,14 +3,15 @@
 Last-mile delivery operations for a carrier working in Luanda: orders, drivers,
 assignment, live tracking and proof of delivery.
 
-> **Status: phases 1 to 4 of 9.** Sessions, roles and company isolation are in
+> **Status: phases 1 to 5 of 9.** Sessions, roles and company isolation are in
 > place; customers, drivers and orders work end to end, driven by a state machine
 > with an audited history; the operator has a dashboard whose numbers link to the
 > lists behind them, an order list with filters, an order detail with a timeline and
-> the actions the domain allows, and a report over any window with a CSV export.
-> The map, realtime tracking and proof of delivery are the phases that follow.
-> Nothing in this README describes something that is not in the repository — the
-> roadmap below marks what exists and what does not.
+> the actions the domain allows, a report over any window with a CSV export, and a
+> map of the parcels in play that also names the ones it cannot draw. Realtime
+> tracking and proof of delivery are the phases that follow. Nothing in this README
+> describes something that is not in the repository — the roadmap below marks what
+> exists and what does not.
 
 ---
 
@@ -67,7 +68,7 @@ and the database carries the same rule as a `CHECK` constraint.
 | Backend   | Node.js, TypeScript, Express 5 |
 | Database  | PostgreSQL 17 |
 | Realtime  | Socket.IO *(phase 6)* |
-| Maps      | Leaflet + OpenStreetMap *(phase 5)* |
+| Maps      | Leaflet + OpenStreetMap |
 | Tests     | Vitest, Supertest, Testing Library |
 | CI        | GitHub Actions: lint, typecheck, tests, build |
 
@@ -93,7 +94,9 @@ cd frontend && npm install && npm run dev        # http://localhost:5175
 The seed is idempotent: run it twice and it refuses to duplicate the demo
 company. It creates one carrier in Luanda, an account per role, five customers,
 three drivers and fourteen orders spread across the state machine — including a
-failed delivery and a return, so no screen is empty and no screen is uniform.
+failed delivery, a return, and one order left without coordinates on purpose, so no
+screen is empty, no screen is uniform, and the panel listing what the map cannot draw
+is actually visible.
 
 | Demo account | Role | Sees |
 |--------------|------|------|
@@ -118,8 +121,8 @@ docker compose up
 ## Tests
 
 ```bash
-cd backend  && npm test    # 109 tests
-cd frontend && npm test    # 23 tests
+cd backend  && npm test    # 125 tests
+cd frontend && npm test    # 39 tests
 ```
 
 The backend suite runs against a real PostgreSQL, not mocks: what is worth
@@ -130,8 +133,11 @@ requests answering `404`, assignment rules — including two operators assigning
 same driver at the same moment, where exactly one must win — and the full path from
 creation to delivery. Reports are tested for what falls inside a window and what does
 not, for the median rather than the mean, and for the CSV rules — escaping, and the
-neutralisation of a value a spreadsheet would execute. The frontend suite covers the
-screens' loading, empty and error states against a stubbed API.
+neutralisation of a value a spreadsheet would execute. The map is tested for the
+scope each role gets, for the orders it reports as undrawable, and for the two
+refusals that matter: a swapped coordinate pair and a finished order. The frontend
+suite covers the screens' loading, empty and error states against a stubbed API, and
+tests the map by what it asks Leaflet to draw rather than by rendering tiles.
 
 The backend suite needs a database. It defaults to `karga_test` on localhost and
 honours `TEST_DATABASE_URL`.
@@ -166,9 +172,10 @@ logs and in the `X-Request-Id` header:
 
 Available today: probes (`GET /health`, `GET /ready`), sessions
 (`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`), the
-dashboard aggregate, orders (list, create, read, assign, change state), customers,
-drivers, and reports (`GET /api/reports/summary`, `GET /api/reports/orders.csv`).
-Full contract in [docs/api.md](docs/api.md).
+dashboard aggregate, orders (list, create, read, assign, change state, set
+destination coordinates), customers, drivers, reports
+(`GET /api/reports/summary`, `GET /api/reports/orders.csv`) and the map
+(`GET /api/map/operation`). Full contract in [docs/api.md](docs/api.md).
 
 ## Documentation
 
@@ -185,8 +192,8 @@ Full contract in [docs/api.md](docs/api.md).
 | 2 | Authentication, roles, company isolation | **done** |
 | 3 | Customers, drivers, orders, state machine, assignment | **done** |
 | 4 | Reports, CSV export, dashboard that leads somewhere | **done** |
-| 5 | Addresses, coordinates, operational map | next |
-| 6 | Socket.IO: driver location, delivery updates, notifications | — |
+| 5 | Coordinates and the operational map | **done** |
+| 6 | Socket.IO: driver location, delivery updates, notifications | next |
 | 7 | Proof of delivery: photo, signature, timestamp, location | — |
 | 8 | Hardening: audit, performance, security review | — |
 | 9 | Deployment, screenshots, release | — |
@@ -249,6 +256,33 @@ and `=HYPERLINK(...)` in a customer name is an attack rather than a typo.
 the card is one click from the rows behind it. The list shows that it is filtered and
 offers the way out — a short list with no visible reason is a bug report waiting to
 happen.
+
+**Coordinates are pinned by hand, not geocoded.** An address in Luanda is usually a
+description and a landmark — "Via S8, loja 4, em frente ao Talatona Imperial" — which
+is exactly how somebody finds it and exactly what a geocoder cannot resolve. The
+operator who knows the place drops the pin, and the written address is never
+overwritten by it.
+
+**A point that would be inside Angola if the numbers were swapped is refused by
+name.** `13.23, -8.83` is a valid pair in the Atlantic, and on a zoomed-in map a
+marker there is not obviously wrong. The API answers with the corrected pair rather
+than "coordenadas inválidas", which would leave whoever typed them hunting for a
+mistake that is one exchange away.
+
+**The map reports what it cannot draw.** Open orders without coordinates come back as
+their own list, counted and linked. A map that quietly omits three parcels is worse
+than one that says so: the dispatcher counts markers and believes them. For the same
+reason, parcels sharing an address collapse into a single pin labelled with how many
+are there, instead of stacking invisibly and contradicting the total.
+
+**Leaflet driven directly, without a React wrapper.** A wrapper is a second
+dependency that has to keep pace with both React and Leaflet, and what it buys is one
+file: Leaflet owns the DOM inside the container, React owns the container.
+
+**The map is loaded on demand.** Leaflet and its stylesheet are a third of the
+application's weight and are needed by two screens, so they are a separate chunk:
+103 kB gzipped for everyone, 44 kB more only for whoever opens a map. A driver
+checking his list on a phone connection should not pay for it.
 
 **Probes registered before CORS.** A misconfigured origin list must not be able to
 make the service look dead to the platform hosting it.
