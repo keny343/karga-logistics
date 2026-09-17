@@ -1,0 +1,98 @@
+.prova-captura__intro {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-small);
+  line-height: var(--text-small-lh);
+  color: var(--color-text-secondary);
+}
+
+.prova-captura {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* Side by side once there is room for both without either being cramped. The photo
+   column stays narrow: it is one button and a line of small print. */
+@media (min-width: 720px) {
+  .prova-captura {
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* A label wearing the primary button's clothes. The cursor is the giveaway that it acts
+   like a button, since a label does not get one by default. */
+.prova-captura__botao {
+  position: relative;
+  cursor: pointer;
+}
+
+.prova-captura__botao:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The focus ring belongs on the label, because the input inside it is what receives focus
+   and the input is the part nobody can see. */
+.prova-captura__botao:focus-within {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.prova-captura__input {
+  /* Hidden from view, not from the accessibility tree: the button labels the action, and
+     `display: none` on a file input makes `click()` unreliable in some browsers. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.prova-captura__foto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.prova-captura__nota {
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.prova-captura__assinatura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.prova-captura__titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* The signature button sits under its box and does not stretch across the card. */
+.prova-captura__assinatura > button {
+  align-self: flex-start;
+}
+
+.prova-captura__aviso {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-small);
+  line-height: var(--text-small-lh);
+  color: var(--color-text);
+}
+
+@media (max-width: 479px) {
+  /* On a phone the photo button is the primary action and gets the full width. */
+  .prova-captura__foto > button {
+    width: 100%;
+  }
+}

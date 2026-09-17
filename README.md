@@ -43,8 +43,15 @@ than `403` — a tenant must not be able to discover that an id exists elsewhere
 **Retries must not duplicate reality.** A driver on a weak connection will send
 the same "delivered" twice. Repeating a transition that already happened is
 refused as `INVALID_STATE_TRANSITION` with a message saying the order is already
-there, so nothing is written twice; proof of delivery gets the same treatment in
-phase 7.
+there, so nothing is written twice. The same photograph sent twice is deduplicated
+by the hash of its bytes, so a driver who taps upload again on a stalled connection
+ends up with one proof, not two.
+
+And a delivery is claimed, not typed: `ENTREGUE` is refused with `PROOF_REQUIRED`
+until at least one proof exists — a photograph at the door or a signature from
+whoever received the parcel. One, not both: a camera that will not focus in a dark
+stairwell, or a customer who refuses to sign, must not be able to block a delivery
+that actually happened.
 
 The state machine, in full:
 
@@ -100,6 +107,14 @@ failed delivery, a return, and one order left without coordinates on purpose, so
 screen is empty, no screen is uniform, and the panel listing what the map cannot draw
 is actually visible.
 
+Every order that reached a door carries proof of what happened there — the delivered
+ones a photograph and a signature, the failed attempt only a photograph — because the
+application refuses to close a delivery without one, and a demonstration that
+contradicts its own rule is worse than none. The images are drawn in code
+(`src/db/imagensDemo.ts`): a parcel on a step and a signature on a line, encoded as
+PNG. They read as placeholders, which is what they are. `npm run seed:reset` drops the
+demo carrier and seeds it again, and touches nothing else.
+
 | Demo account | Role | Sees |
 |--------------|------|------|
 | `admin@karga.ao` | ADMIN | everything |
@@ -123,8 +138,8 @@ docker compose up
 ## Tests
 
 ```bash
-cd backend  && npm test    # 149 tests
-cd frontend && npm test    # 61 tests
+cd backend  && npm test    # 177 tests
+cd frontend && npm test    # 78 tests
 ```
 
 The backend suite runs against a real PostgreSQL, not mocks: what is worth
@@ -156,10 +171,21 @@ were told nothing. And a story that stops making sense halfway: each step assert
 against what the last one produced, so a change that breaks the chain between two
 features fails here even when both still pass their own tests.
 
+The upload tests are mostly refusals, because that is where an upload endpoint is
+either safe or not: a PNG renamed `.jpg`, an SVG declaring itself a JPEG, a file over
+the limit, a request with no file at all, coordinates outside Angola, a capture time in
+the future, the same bytes sent twice, and the eleventh proof on an order that is
+allowed ten. Then the scope: a driver may only prove his own deliveries, a customer may
+look and not attach, and another carrier gets `404` for the order, the list and the
+file alike.
+
 The frontend suite covers the screens' loading, empty and error states against a stubbed
 API, tests the map by what it asks Leaflet to draw rather than by rendering tiles, and
 tests the driver's position sharing against a fake geolocation — including the states
-where it should refuse to claim it is working.
+where it should refuse to claim it is working. Proof capture is tested against a fake
+canvas: that a photograph is downscaled and converted before it leaves the phone, that a
+signature only becomes attachable once something has been drawn, and that a delivery
+refused for want of proof puts the instruction next to the camera it is asking for.
 
 The backend suite needs a database. It defaults to `karga_test` on localhost and
 honours `TEST_DATABASE_URL`.
@@ -195,7 +221,9 @@ logs and in the `X-Request-Id` header:
 Available today: probes (`GET /health`, `GET /ready`), sessions
 (`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`), the
 dashboard aggregate, orders (list, create, read, assign, change state, set
-destination coordinates), customers, drivers, reports
+destination coordinates), delivery proofs (`POST /api/orders/:id/proofs`,
+`GET /api/orders/:id/proofs`, `GET /api/orders/:id/proofs/:proofId/file`),
+customers, drivers, reports
 (`GET /api/reports/summary`, `GET /api/reports/orders.csv`) and the map
 (`GET /api/map/operation`). Live updates arrive over Socket.IO on `/realtime`,
 authenticated by the same session cookie. Full contract in
@@ -218,7 +246,7 @@ authenticated by the same session cookie. Full contract in
 | 4 | Reports, CSV export, dashboard that leads somewhere | **done** |
 | 5 | Coordinates and the operational map | **done** |
 | 6 | Socket.IO: driver location, delivery updates, notifications | **done** |
-| 7 | Proof of delivery: photo, signature, timestamp, location | next |
+| 7 | Proof of delivery: photo, signature, timestamp, location | **done** |
 | 8 | Hardening: audit, performance, security review | — |
 | 9 | Deployment, screenshots, release | — |
 
@@ -352,6 +380,32 @@ office can see him until the server has acknowledged a point.
 changing believes the operation is calm, so the header always says whether the screens
 are updating themselves. The distinction between "nothing is happening" and "I am no
 longer being told" is the whole reason the indicator exists.
+
+**Proof bytes live in Postgres, as `bytea`.** Object storage is where a million
+photographs belong, and this will move there when the volume says so. It does not say so
+yet, and the version that stores them in the database has properties the split version
+does not: a proof and the transaction that accepted it commit or fail together, there is
+no orphaned object to reconcile after a failed upload, and a restore brings back the
+evidence with the delivery it belongs to. It also keeps the deployment to one managed
+service instead of a bucket, a lifecycle policy and a set of credentials, on a platform
+whose filesystem is wiped on every deploy. Photographs are downscaled in the browser
+before they are sent and capped at 5 MB, ten per order, so the ceiling is known.
+
+**An uploaded image is verified by its bytes, never by what it says it is.** The
+declared type, the extension and the first bytes of the file all have to agree, and
+those bytes are the ones that decide — a `.jpg` that begins `<svg` is refused, because a
+filename is a claim and a magic number is evidence. What is served back is served with
+`nosniff`, a `default-src 'none'` policy and a generated filename: the client's name is
+never echoed, since a name is a path in disguise and it would arrive in somebody's
+download folder.
+
+**A proof records the phone's time and the server's, and shows both when they differ.**
+A driver in a dead zone photographs the parcel at the door and the upload lands twenty
+minutes later at a junction with signal. Smoothing that into one timestamp would be
+inventing evidence, so the panel says "16:40, recebida 17:02" and leaves the reader to
+draw the conclusion. Location is the same: recorded with the accuracy the phone
+reported, or shown as "Sem posição" when it could not get a fix — a proof without a
+point is still a proof, it just does not say where.
 
 **Probes registered before CORS.** A misconfigured origin list must not be able to
 make the service look dead to the platform hosting it.

@@ -62,6 +62,8 @@ nullable with `ON DELETE SET NULL` and carries a text label copied at write time
 | `drivers` | Who carries it, their vehicle and availability. |
 | `orders` | The parcel, its two addresses and its current status. |
 | `order_status_history` | Every accepted transition, with actor and note. |
+| `driver_positions` | The last point reported per driver, upserted, no trail. |
+| `delivery_proofs` | Photographs and signatures, their bytes, and where and when they were taken. |
 
 `user_role` is an enum (`ADMIN`, `OPERADOR`, `MOTORISTA`, `CLIENTE`). Four values
 the code branches on belong in the type system rather than in a table someone can
@@ -86,6 +88,18 @@ installation, not per company. Two carriers would otherwise both have a
 `orders (driver_id) WHERE status IN ('ATRIBUIDO','RECOLHIDO','EM_ENTREGA')` makes
 double assignment impossible at the storage layer, so a race between two operators
 cannot produce it even if the service check passes for both.
+
+**Proof bytes are a `bytea` column, not a path to a bucket.** A proof and the delivery
+it belongs to commit together, a restore brings back both, and a failed upload leaves
+nothing to reconcile. The row is fenced in by constraints rather than by trust in the
+service: size between one byte and 5 MB, MIME type one of three, SHA-256 matching
+`^[0-9a-f]{64}$`, latitude and longitude either both present or both absent and each
+inside its range. A unique index on `(order_id, sha256)` makes the same image uploaded
+twice one row, which is what a driver retrying on a bad connection produces.
+
+This is the table to move to object storage first if volume ever demands it. Ten proofs
+per order at a few hundred kilobytes each is a bounded cost at this size, and every
+other property of keeping them here is worth more than the disk.
 
 ## Indexing
 

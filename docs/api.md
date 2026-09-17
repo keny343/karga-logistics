@@ -30,6 +30,8 @@ traces never reach a client.
 | `NOT_FOUND` | 404 | Absent, or belonging to another company |
 | `CONFLICT` | 409 | The request contradicts the current state of the data |
 | `INVALID_STATE_TRANSITION` | 409 | The order cannot move that way |
+| `PROOF_REQUIRED` | 409 | `ENTREGUE` was asked for on an order with no proof attached |
+| `PAYLOAD_TOO_LARGE` | 413 | The body, or an uploaded image, is over the limit |
 | `RATE_LIMITED` | 429 | Too many requests, or too many failed logins |
 | `INTERNAL_ERROR` | 500 | Unexpected; the request id is the way to find it |
 | `SERVICE_UNAVAILABLE` | 503 | Readiness probe could not reach the database |
@@ -95,7 +97,37 @@ would refuse.
 `weightGrams`. `POST /api/orders/:id/assign` takes `{ driverId }` and refuses a
 driver who is off duty or already carrying a parcel, with a message that says
 which. `POST /api/orders/:id/status` takes `{ status, note? }`; the note is kept in
-the history and is how a failed delivery gets explained.
+the history and is how a failed delivery gets explained. Asking for `ENTREGUE` on an
+order with no proof attached is refused with `PROOF_REQUIRED`.
+
+## Delivery proofs
+
+| Method | Path | Roles |
+|--------|------|-------|
+| POST | `/api/orders/:id/proofs` | ADMIN, OPERADOR, MOTORISTA |
+| GET | `/api/orders/:id/proofs` | any, narrowed by role |
+| GET | `/api/orders/:id/proofs/:proofId/file` | any, narrowed by role |
+
+Attaching is `multipart/form-data` with the image in `file` and the rest as fields:
+`kind` (`FOTO` or `ASSINATURA`), and optionally `latitude`, `longitude`,
+`accuracyMeters` and `capturedAt` as reported by the device. JPEG, PNG or WebP, up to
+5 MB, up to ten per order, and only from `RECOLHIDO` onwards — there is nothing to
+prove about a parcel still in the warehouse. The same bytes sent twice return the
+proof that already exists rather than a second one.
+
+The refusals are specific on purpose: a file whose magic bytes contradict its declared
+type or its extension is `VALIDATION_ERROR` naming both, an oversized image is
+`PAYLOAD_TOO_LARGE`, a point outside Angola or a capture time in the future is
+`VALIDATION_ERROR`, and the eleventh proof is `CONFLICT`.
+
+The list returns metadata and a URL per proof — never bytes — with `capturedAt` from
+the device beside `storedAt` from the server, the coordinates and accuracy if there
+were any, the uploader, the byte size and the SHA-256. The file endpoint returns the
+bytes with `Cache-Control: private`, an `ETag` of the hash, `nosniff`, a
+`default-src 'none'` policy and a generated filename; a repeat request with
+`If-None-Match` gets `304`.
+
+Attaching one publishes `encomenda:actualizada` with `motivo: "prova"`.
 
 ## Reports
 
@@ -263,4 +295,4 @@ missed events and cannot know which.
 
 ## Planned
 
-Proof of delivery uploads (phase 7).
+Public parcel tracking by code, for a customer who does not have an account.

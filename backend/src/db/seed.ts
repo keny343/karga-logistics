@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import { closePool, query, transaction } from '../config/database.js';
+import { assinaturaDemo, fotografiaDemo } from './imagensDemo.js';
 import { hashDePassword } from '../services/auth.service.js';
 import { logger } from '../utils/logger.js';
 import type { OrderStatus } from '../domain/orderStatus.js';
@@ -204,7 +206,9 @@ const seed = async (): Promise<void> => {
       clientes.push(id);
     }
 
-    const motoristas: string[] = [];
+    // Kept alongside the ids because the proofs below are signed with the driver's own
+    // name and account, the way they would be if he had photographed the parcel himself.
+    const motoristas: { id: string; label: string; userId: string | null }[] = [];
     for (const motorista of MOTORISTAS) {
       const contaLigada =
         motorista.email !== undefined ? (utilizadores.get(motorista.email) ?? null) : null;
@@ -224,17 +228,24 @@ const seed = async (): Promise<void> => {
       );
       const id = criado.rows[0]?.id;
       if (id === undefined) throw new Error(`motorista ${motorista.name} não criado`);
-      motoristas.push(id);
+      motoristas.push({
+        id,
+        label:
+          motorista.email === undefined
+            ? motorista.name
+            : `${motorista.name} (${motorista.email})`,
+        userId: contaLigada,
+      });
     }
 
-    for (const guiao of GUIOES) {
+    for (const [indice, guiao] of GUIOES.entries()) {
       const clienteId = clientes[guiao.cliente];
       const cliente = CLIENTES[guiao.cliente];
       if (clienteId === undefined || cliente === undefined) throw new Error('cliente inválido no guião');
 
       const criadaEm = horasAtras(guiao.horasAtras);
-      const motoristaId =
-        guiao.motorista !== undefined ? (motoristas[guiao.motorista] ?? null) : null;
+      const motorista = guiao.motorista !== undefined ? motoristas[guiao.motorista] : undefined;
+      const motoristaId = motorista?.id ?? null;
 
       const encomenda = await client.query<{ id: string; code: string }>(
         `INSERT INTO orders (
@@ -310,6 +321,55 @@ const seed = async (): Promise<void> => {
 
       const estadoFinal = guiao.caminho.at(-1) ?? 'CRIADO';
       const terminou = ['ENTREGUE', 'CANCELADO', 'DEVOLVIDO'].includes(estadoFinal);
+
+      // Anything that reached a door has proof of what happened there, because the
+      // application refuses to close a delivery without it and a demonstration that
+      // contradicts its own rule is worse than no demonstration. A delivered parcel gets
+      // the photograph and the signature; a failed attempt gets only the photograph, which
+      // is all a driver can bring back from a locked gate.
+      const provouNaPorta = ['ENTREGUE', 'FALHA_ENTREGA', 'DEVOLVIDO'].includes(estadoFinal);
+      if (provouNaPorta && motorista !== undefined) {
+        const provas: { kind: 'FOTO' | 'ASSINATURA'; bytes: Buffer; quando: Date }[] = [
+          { kind: 'FOTO', bytes: fotografiaDemo(indice), quando: momento },
+        ];
+        if (estadoFinal === 'ENTREGUE') {
+          // A minute later: the photograph is taken while the parcel changes hands, the
+          // signature after it has.
+          provas.push({
+            kind: 'ASSINATURA',
+            bytes: assinaturaDemo(indice),
+            quando: new Date(momento.getTime() + 60_000),
+          });
+        }
+
+        for (const prova of provas) {
+          await client.query(
+            `INSERT INTO delivery_proofs
+               (company_id, order_id, kind, driver_id, uploaded_by, uploader_label,
+                mime_type, byte_size, sha256, bytes,
+                latitude, longitude, accuracy_meters, captured_at, created_at)
+             VALUES ($1, $2, $3::proof_kind, $4, $5, $6, 'image/png', $7, $8, $9,
+                     $10, $11, $12, $13, $13)`,
+            [
+              companyId,
+              orderId,
+              prova.kind,
+              motorista.id,
+              motorista.userId ?? operadorId,
+              motorista.label,
+              prova.bytes.length,
+              createHash('sha256').update(prova.bytes).digest('hex'),
+              prova.bytes,
+              // An address nobody has pinned yet leaves its proofs without a point, which
+              // is the honest case the panel has to be able to show.
+              guiao.semPonto === true ? null : cliente.latitude,
+              guiao.semPonto === true ? null : cliente.longitude,
+              guiao.semPonto === true ? null : 8 + (indice % 5) * 6,
+              prova.quando,
+            ],
+          );
+        }
+      }
 
       await client.query(
         `UPDATE orders SET status = $2, completed_at = $3, updated_at = $4 WHERE id = $1`,

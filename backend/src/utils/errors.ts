@@ -10,6 +10,10 @@ export const ERROR_CODES = {
   NOT_FOUND: 404,
   COMPANY_MISMATCH: 404,
   INVALID_STATE_TRANSITION: 409,
+  // A delivery with nothing behind it. Separate from the transition code because the
+  // interface answers it differently: the move was legal, the evidence is missing, and
+  // the screen should open the camera rather than explain the state machine.
+  PROOF_REQUIRED: 409,
   CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
   UNSUPPORTED_MEDIA_TYPE: 415,

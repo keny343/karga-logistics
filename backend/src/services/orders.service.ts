@@ -4,6 +4,7 @@ import { publicar } from '../realtime/bus.js';
 import { assegurarTransicao, isFinal, statusLegivel, type OrderStatus } from '../domain/orderStatus.js';
 import * as motoristas from '../repositories/drivers.repository.js';
 import * as encomendas from '../repositories/orders.repository.js';
+import * as provas from '../repositories/proofs.repository.js';
 import { registarAuditoria } from './audit.service.js';
 import { AppError } from '../utils/errors.js';
 import type { Autenticado } from '../types/domain.js';
@@ -53,8 +54,17 @@ const encomendaOuNada = async (companyId: string, orderId: string) => {
 
 export const detalhe = async (companyId: string, orderId: string) => {
   const linha = await encomendaOuNada(companyId, orderId);
-  const historico = await encomendas.historico(linha.id);
-  return encomendas.paraDetalhe(linha, historico);
+  // Metadata only, never the image bytes: this shape is rendered on every screen that
+  // shows an order, and one that carried megabytes would be slow for an invisible reason.
+  const [historico, anexos] = await Promise.all([
+    encomendas.historico(linha.id),
+    provas.daEncomenda(companyId, linha.id),
+  ]);
+
+  return {
+    ...encomendas.paraDetalhe(linha, historico),
+    proofs: anexos.map(provas.paraDto),
+  };
 };
 
 export const criar = async (contexto: Contexto, dados: encomendas.NovaEncomenda) => {
@@ -249,6 +259,27 @@ export const mudarEstado = async (
       );
       if (meu.rows.length === 0) {
         throw new AppError('FORBIDDEN', 'Só podes actualizar entregas atribuídas a ti.');
+      }
+    }
+
+    // Ownership is settled first, deliberately. Whether somebody else's delivery has a
+    // photograph attached is not a driver's business, and answering "falta a prova" to a
+    // parcel that is not his would tell him something about it.
+    //
+    // A delivery is claimed, not merely typed: at least one proof - a photograph at the
+    // door or a signature - has to exist before the parcel can be called delivered.
+    //
+    // One, not both. A camera that will not focus in a dark stairwell, or a customer who
+    // refuses to sign, must not be able to stop a delivery that actually happened. The
+    // rule buys that ENTREGUE always has something behind it; demanding two would buy a
+    // driver stranded at a door with a parcel he has already handed over.
+    if (para === 'ENTREGUE') {
+      const quantas = await provas.contarNaTransacao(client, companyId, orderId);
+      if (quantas === 0) {
+        throw new AppError(
+          'PROOF_REQUIRED',
+          `A encomenda ${linha.code} precisa de uma prova de entrega: uma fotografia ou a assinatura de quem recebeu.`,
+        );
       }
     }
 

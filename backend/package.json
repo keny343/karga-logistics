@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "seed:reset": "tsx src/db/limparDemo.ts && tsx src/db/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.typecheck.json",
@@ -23,6 +24,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
+    "multer": "^2.4.0",
     "pg": "^8.13.1",
     "socket.io": "^4.8.3",
     "zod": "^3.24.1"
@@ -33,6 +35,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.6",
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.2",

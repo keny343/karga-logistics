@@ -6,9 +6,12 @@ import * as dashboard from '../controllers/dashboard.controller.js';
 import * as motoristas from '../controllers/drivers.controller.js';
 import * as mapa from '../controllers/map.controller.js';
 import * as encomendas from '../controllers/orders.controller.js';
+import * as provas from '../controllers/proofs.controller.js';
 import * as relatorios from '../controllers/reports.controller.js';
 import { requerAutenticacao, requerPapel } from '../middleware/authenticate.js';
+import { umaImagem } from '../middleware/upload.js';
 import { env } from '../config/env.js';
+import { AppError } from '../utils/errors.js';
 
 /**
  * Health and readiness are wired directly onto the app, ahead of CORS, so a probe
@@ -79,6 +82,37 @@ apiRouter.post(
   rota(encomendas.mudarEstado),
 );
 apiRouter.patch('/orders/:id/coordinates', operacao, rota(encomendas.definirCoordenadas));
+
+// -------------------------------------------------------- provas de entrega
+/**
+ * A tighter limit than the API's own. An image is orders of magnitude more expensive to
+ * accept than a JSON body, and a driver at a door sends a handful over a few minutes -
+ * never sixty. The window is generous enough for a hesitant upload and for the retry
+ * after a dropped connection.
+ */
+const limiteProvas = rateLimit({
+  windowMs: 60_000,
+  limit: env.isTest ? 1_000 : 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, _res, next) => {
+    next(new AppError('RATE_LIMITED', 'Demasiadas provas seguidas. Espera um instante.'));
+  },
+});
+
+// The driver who is carrying the parcel, or an operator at the counter. The service
+// checks which parcel is his; a customer may read a proof but never add one.
+apiRouter.post(
+  '/orders/:id/proofs',
+  requerPapel('ADMIN', 'OPERADOR', 'MOTORISTA'),
+  limiteProvas,
+  umaImagem,
+  rota(provas.anexar),
+);
+// Open to every role: the service narrows it to the orders the session may read, which
+// includes the customer waiting for this one.
+apiRouter.get('/orders/:id/proofs', rota(provas.listar));
+apiRouter.get('/orders/:id/proofs/:proofId/file', rota(provas.ficheiro));
 
 // -------------------------------------------------------------------- mapa
 // Open to every role: each one gets the slice its session allows, resolved from the

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { closePool, query } from '../src/config/database.js';
 import {
+  anexarProva,
   criarCliente,
   criarEmpresa,
   criarEncomenda,
@@ -317,6 +318,9 @@ describe('POST /api/orders/:id/status', () => {
     expect((await passo('RECOLHIDO')).status).toBe(200);
     expect((await passo('EM_ENTREGA')).status).toBe(200);
 
+    // A delivery needs something behind it, so the proof comes before the claim.
+    expect((await anexarProva(app, cookieOperador, orderId)).status).toBe(201);
+
     const entregue = await passo('ENTREGUE');
     expect(entregue.status).toBe(200);
     expect(entregue.body.order.status).toBe('ENTREGUE');
@@ -403,6 +407,8 @@ describe('POST /api/orders/:id/status', () => {
       driverId: outroMotorista,
     });
 
+    expect((await anexarProva(app, cookie, minha.id)).status).toBe(201);
+
     const propria = await request(app)
       .post(`/api/orders/${minha.id}/status`)
       .set('Cookie', cookie)
@@ -413,6 +419,8 @@ describe('POST /api/orders/:id/status', () => {
       .post(`/api/orders/${alheia.id}/status`)
       .set('Cookie', cookie)
       .send({ status: 'ENTREGUE' });
+    // Refused for whose it is, not for what it is missing: the answer must not say
+    // anything about the state of a parcel that is not his.
     expect(doOutro.status).toBe(403);
   });
 

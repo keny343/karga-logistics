@@ -82,6 +82,22 @@ export const coordenadasSchema = z.object({
   longitude: z.number().min(-180).max(180),
 });
 
+/**
+ * The fields that travel beside a proof's bytes.
+ *
+ * Everything arrives as a string, because this is the text part of a multipart form
+ * rather than JSON, so the numbers are coerced. `capturedAt` is what the device claimed
+ * the time was and is treated as a claim: the service refuses one from the future,
+ * because a phone with a wrong clock is common and a proof dated tomorrow is worthless.
+ */
+export const provaSchema = z.object({
+  kind: z.enum(['FOTO', 'ASSINATURA']),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  accuracyMeters: z.coerce.number().int().min(0).max(100_000).optional(),
+  capturedAt: z.string().datetime({ offset: true }).optional(),
+});
+
 export const idSchema = z.string().uuid('Identificador inválido.');
 
 const DIA = /^\d{4}-\d{2}-\d{2}$/;

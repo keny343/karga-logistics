@@ -1,0 +1,35 @@
+.assinatura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.assinatura__area {
+  /* Fixed ratio, so the box never resizes as the layout shifts: a canvas that changes
+     size loses what was drawn on it, and losing a signature at a door is not acceptable. */
+  aspect-ratio: 5 / 2;
+  width: 100%;
+  background: #ffffff;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  /* A finger drawing must not scroll the page underneath it. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.assinatura__area:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.assinatura__pe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.assinatura__dica {
+  font-size: var(--text-small);
+  color: var(--color-text-secondary);
+}

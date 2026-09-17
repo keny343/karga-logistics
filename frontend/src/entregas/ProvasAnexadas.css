@@ -1,0 +1,104 @@
+.provas__vazio {
+  font-size: var(--text-small);
+  line-height: var(--text-small-lh);
+  color: var(--color-text-secondary);
+}
+
+.provas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.provas__item {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.provas__item + .provas__item {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.provas__miniatura {
+  flex-shrink: 0;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: zoom-in;
+}
+
+.provas__miniatura img {
+  width: 100%;
+  height: 100%;
+  /* Cover, so a portrait photo and a wide signature both fill the same square without
+     distorting either. */
+  object-fit: cover;
+  display: block;
+}
+
+.provas__miniatura:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.provas__dados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.provas__tipo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.provas__quando {
+  font-size: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.provas__onde,
+.provas__quem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-lh);
+  color: var(--color-text-muted);
+  /* A coordinate pair and an email are both long and neither is worth wrapping. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provas__grande img {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+
+.provas__grande figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.provas__hash {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

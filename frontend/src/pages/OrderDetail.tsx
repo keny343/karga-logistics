@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Package, Truck, User } from 'lucide-react';
 import { ApiError, api, type Driver, type Order } from '../api/client';
@@ -8,6 +8,8 @@ import {
   statusLabel,
   type OrderStatus,
 } from '../domain/orderStatus';
+import { CapturarProva } from '../entregas/CapturarProva';
+import { ProvasAnexadas } from '../entregas/ProvasAnexadas';
 import { useResource } from '../hooks/useResource';
 import { useSession } from '../auth/SessionContext';
 import { useAoReligar, useEventoTempoReal } from '../realtime/RealtimeContext';
@@ -104,10 +106,16 @@ export const OrderDetail = () => {
   const [nota, setNota] = useState('');
   const [aGuardar, setAGuardar] = useState(false);
   const [modalAtribuir, setModalAtribuir] = useState(false);
+  const [faltaProva, setFaltaProva] = useState(false);
+  const provaRef = useRef<HTMLDivElement | null>(null);
 
   const encomenda = data?.order ?? null;
   const podeOperar = user?.role === 'ADMIN' || user?.role === 'OPERADOR';
   const podeMudar = podeOperar || user?.role === 'MOTORISTA';
+  // Evidence is added by the side that carried the parcel, and only while the parcel is
+  // in play: a delivered order's proof is history, and a customer never attaches one.
+  const podeProvar =
+    podeMudar && ['RECOLHIDO', 'EM_ENTREGA', 'FALHA_ENTREGA'].includes(encomenda?.status ?? '');
 
   const mudarEstado = async (status: OrderStatus, comNota: string): Promise<void> => {
     setAGuardar(true);
@@ -116,8 +124,17 @@ export const OrderDetail = () => {
       aviso.sucesso(`Encomenda actualizada para ${statusLabel(status)}.`);
       setAMudar(null);
       setNota('');
+      setFaltaProva(false);
       reload();
     } catch (falha) {
+      // A delivery refused for want of evidence is not a failure to explain in a toast
+      // that disappears: the driver has to do something, and the something is on this
+      // page. The card is highlighted and scrolled to instead.
+      if (falha instanceof ApiError && falha.code === 'PROOF_REQUIRED') {
+        setFaltaProva(true);
+        provaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
       aviso.erro(
         falha instanceof ApiError
           ? falha.message
@@ -212,6 +229,27 @@ export const OrderDetail = () => {
           <Card title="Percurso">
             <Timeline steps={construirTimeline(encomenda)} />
           </Card>
+
+          <div ref={provaRef} className="detalhe__prova" data-falta={faltaProva}>
+            {faltaProva ? (
+              <p className="detalhe__aviso" role="status">
+                Esta entrega ainda não tem prova. Tira uma fotografia ou recolhe a assinatura de
+                quem recebeu, e depois marca como entregue.
+              </p>
+            ) : null}
+            {podeProvar ? (
+              <CapturarProva
+                orderId={id}
+                onAnexada={() => {
+                  setFaltaProva(false);
+                  reload();
+                }}
+              />
+            ) : null}
+            {/* Shown to everyone who may read the order, the customer included: the proof
+                is the answer to "chegou?" and hiding it from her serves nobody. */}
+            <ProvasAnexadas provas={encomenda.proofs} />
+          </div>
 
           <Suspense fallback={null}>
             <DestinoNoMapa

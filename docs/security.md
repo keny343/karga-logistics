@@ -166,12 +166,44 @@ retired — takes effect on the socket and not only on the next request.
 Angola, including the swapped-pair case. Ingestion is rate limited per socket in the
 server, so a compromised or buggy client cannot turn a phone into a write loop.
 
-## Phase 7 (uploads)
+## Uploads
 
-Proof-of-delivery photos will be validated on MIME type, extension, size and
-magic bytes, stored outside the application directory with generated names, and
-served without any execution path. A filename from a client is never trusted as a
-path.
+Proof of delivery is the only upload the application accepts, and it accepts it
+narrowly. `multer` keeps the file in memory — one file, 5 MB, refused as
+`PAYLOAD_TOO_LARGE` before anything reads it — and nothing is ever written to the
+filesystem, so there is no directory to traverse, no name to sanitise and no path to
+get wrong. The bytes go into a `bytea` column in the same transaction that records
+them.
+
+**The bytes decide what the file is.** The declared MIME type, the extension and the
+first bytes must agree, and the magic number is the authority: JPEG, PNG or WebP, or
+the upload is refused with a message that says what the file actually is. A `.jpg`
+that begins `<svg` — the reliable way to smuggle a script past an image filter — never
+reaches storage.
+
+**Serving is deliberately inert.** `Content-Type` from the sniffed type rather than
+from the client, `X-Content-Type-Options: nosniff`, `Content-Security-Policy:
+default-src 'none'; sandbox`, `Cross-Origin-Resource-Policy: same-origin`, and
+`Content-Disposition: inline` with a name derived from the proof id — the client's
+filename is never echoed. The security headers are set before the `If-None-Match`
+check as well as after it, because a browser overwrites the headers it has stored for
+an image with the ones that come back from revalidating it; a `304` without them would
+leave a cached proof under the application's policy, which allows scripts.
+
+**Caching is private.** `private, max-age=0, must-revalidate`, so no proxy between the
+server and the browser keeps one company's evidence where another request could find
+it. The `ETag` is the SHA-256 of the bytes, which is also what deduplicates a proof
+uploaded twice.
+
+**Scope is the order's scope.** Listing proofs, viewing one and attaching one all go
+through the same access check as the order itself: another company gets `404`, a driver
+reaches only his own deliveries, and a customer can look but not attach. A proof id
+that belongs to a different order is `404` even inside the right company.
+
+**What the device claimed is kept apart from what the server saw.** The capture time
+and coordinates come from the phone and are recorded as such — validated for range,
+inside Angola, and refused if the clock is in the future — alongside the server's own
+receipt time. Neither is presented as the other.
 
 ## Auditing
 
@@ -183,7 +215,7 @@ Recorded today: `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `ORDER_CREATED`,
 `ORDER_ASSIGNED`, `DELIVERY_PICKED_UP`, `DELIVERY_STARTED`, `DELIVERY_COMPLETED`,
 `DELIVERY_FAILED`, `ORDER_CANCELLED`, `ORDER_RETURNED`, `CUSTOMER_CREATED`,
 `DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`, `REPORT_EXPORTED`,
-`ORDER_COORDINATES_SET`.
+`ORDER_COORDINATES_SET`, `DELIVERY_PROOF_ADDED`.
 
 A failed audit write never fails the request: by then the action has already
 succeeded, and refusing it afterwards would be worse than a missing row. The

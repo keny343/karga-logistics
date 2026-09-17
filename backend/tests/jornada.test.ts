@@ -3,7 +3,14 @@ import request from 'supertest';
 import type { Socket as SocketCliente } from 'socket.io-client';
 import { createApp } from '../src/app.js';
 import { closePool, query } from '../src/config/database.js';
-import { criarEmpresa, criarUtilizador, iniciarSessao, limparBase } from './helpers/fixtures.js';
+import {
+  criarEmpresa,
+  criarUtilizador,
+  iniciarSessao,
+  limparBase,
+  JPEG_1X1,
+  PNG_1X1,
+} from './helpers/fixtures.js';
 import {
   arrancar,
   assentar,
@@ -341,6 +348,46 @@ describe('a working afternoon, with everybody signed in', () => {
       .set('Cookie', motorista.cookie)
       .send({ status: 'EM_ENTREGA' });
 
+    // He tries to close it on his word alone, and the system does not take his word.
+    const semProva = await request(app)
+      .post(`/api/orders/${encomenda.id}/status`)
+      .set('Cookie', motorista.cookie)
+      .send({ status: 'ENTREGUE' });
+    expect(semProva.status).toBe(409);
+    expect(semProva.body.error.code).toBe('PROOF_REQUIRED');
+
+    // So he photographs the parcel on the counter, with the point his phone had.
+    const prova = await request(app)
+      .post(`/api/orders/${encomenda.id}/proofs`)
+      .set('Cookie', motorista.cookie)
+      .field('kind', 'FOTO')
+      .field('latitude', String(DESTINO.latitude))
+      .field('longitude', String(DESTINO.longitude))
+      .field('accuracyMeters', '12')
+      .field('capturedAt', new Date().toISOString())
+      .attach('file', JPEG_1X1, { filename: 'balcao.jpg', contentType: 'image/jpeg' });
+
+    expect(prova.status).toBe(201);
+    expect(prova.body.proof).toMatchObject({
+      kind: 'FOTO',
+      mimeType: 'image/jpeg',
+      driverName: 'Manuel Cardoso',
+      accuracyMeters: 12,
+    });
+
+    // And D. Rosa signs on the phone.
+    const assinatura = await request(app)
+      .post(`/api/orders/${encomenda.id}/proofs`)
+      .set('Cookie', motorista.cookie)
+      .field('kind', 'ASSINATURA')
+      .attach('file', PNG_1X1, { filename: 'assinatura.png', contentType: 'image/png' });
+    expect(assinatura.status).toBe(201);
+
+    // The operator's screen learns about the proof without being asked.
+    await operador.gravador.ate('a prova a chegar à central', (g) =>
+      g.de<{ motivo: string }>('encomenda:actualizada').some((e) => e.motivo === 'prova'),
+    );
+
     const entregue = await request(app)
       .post(`/api/orders/${encomenda.id}/status`)
       .set('Cookie', motorista.cookie)
@@ -384,11 +431,36 @@ describe('a working afternoon, with everybody signed in', () => {
     ]);
     expect(historia.at(-1)?.note).toContain('D. Rosa');
 
+    // And she sees what was shown at her door, photo and signature, and can open them.
+    const provasDela = await request(app)
+      .get(`/api/orders/${encomenda.id}/proofs`)
+      .set('Cookie', cliente.cookie);
+    expect(provasDela.body.items.map((item: { kind: string }) => item.kind)).toEqual([
+      'FOTO',
+      'ASSINATURA',
+    ]);
+
+    const imagem = await request(app)
+      .get(provasDela.body.items[0].url as string)
+      .set('Cookie', cliente.cookie);
+    expect(imagem.status).toBe(200);
+    expect(imagem.headers['content-type']).toBe('image/jpeg');
+    // Served as an image and nothing else: no sniffing, and a policy that would let a
+    // document do nothing if one ever got this far.
+    expect(imagem.headers['x-content-type-options']).toBe('nosniff');
+    expect(imagem.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(Buffer.compare(imagem.body as Buffer, JPEG_1X1)).toBe(0);
+
     // The rival carrier cannot even discover that the id exists.
     const paraRival = await request(app)
       .get(`/api/orders/${encomenda.id}`)
       .set('Cookie', rival.cookie);
     expect(paraRival.status).toBe(404);
+
+    const provaParaRival = await request(app)
+      .get(provasDela.body.items[0].url as string)
+      .set('Cookie', rival.cookie);
+    expect(provaParaRival.status).toBe(404);
 
     // A delivered parcel leaves the map, and its destination can no longer be moved:
     // where it went is history now.
@@ -447,6 +519,9 @@ describe('a working afternoon, with everybody signed in', () => {
       'DELIVERY_STARTED',
       'DELIVERY_FAILED',
       'DELIVERY_STARTED',
+      // The refused delivery left no row: nothing happened, so nothing is recorded.
+      'DELIVERY_PROOF_ADDED',
+      'DELIVERY_PROOF_ADDED',
       'DELIVERY_COMPLETED',
     ]);
     // Who did it, not only what happened: the dispatch is hers, the road is his.

@@ -45,7 +45,11 @@ export const request = async <T>(caminho: string, init: RequestInit = {}): Promi
       ...init,
       credentials: 'include',
       headers: {
-        ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        // A FormData body sets its own content type, boundary included. Naming it here
+        // would produce a multipart body the server cannot split.
+        ...(init.body !== undefined && !(init.body instanceof FormData)
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         ...init.headers,
       },
     });
@@ -152,6 +156,30 @@ export interface OrderSummary {
   readonly late: boolean;
 }
 
+/**
+ * What was shown at the door.
+ *
+ * The two timestamps are both here on purpose: `capturedAt` is what the phone claimed and
+ * may be missing or wrong, `storedAt` is when the server accepted the bytes. The screens
+ * show the gap when there is one rather than choosing one and calling it the time.
+ */
+export interface DeliveryProof {
+  readonly id: string;
+  readonly kind: 'FOTO' | 'ASSINATURA';
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly sha256: string;
+  readonly driverId?: string;
+  readonly driverName?: string;
+  readonly uploadedBy: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly accuracyMeters?: number;
+  readonly capturedAt?: string;
+  readonly storedAt: string;
+  readonly url: string;
+}
+
 export interface Order extends OrderSummary {
   readonly customerId: string;
   readonly driverId?: string;
@@ -163,6 +191,7 @@ export interface Order extends OrderSummary {
   readonly completedAt?: string;
   readonly history: readonly OrderHistoryEntry[];
   readonly allowedTransitions: readonly OrderStatus[];
+  readonly proofs: readonly DeliveryProof[];
 }
 
 export interface Pagina<T> {
@@ -317,6 +346,38 @@ export const api = {
       status,
       ...(note !== undefined && note !== '' ? { note } : {}),
     }),
+  /**
+   * The image goes up as multipart because that is what an image is. The blob's own type
+   * is passed as the filename extension's partner: the server sniffs the bytes anyway,
+   * and a mismatch between the two is exactly what it refuses.
+   */
+  addProof: (
+    id: string,
+    prova: {
+      kind: 'FOTO' | 'ASSINATURA';
+      ficheiro: Blob;
+      nome: string;
+      latitude?: number;
+      longitude?: number;
+      accuracyMeters?: number;
+      capturedAt?: string;
+    },
+  ) => {
+    const form = new FormData();
+    form.set('kind', prova.kind);
+    if (prova.latitude !== undefined) form.set('latitude', String(prova.latitude));
+    if (prova.longitude !== undefined) form.set('longitude', String(prova.longitude));
+    if (prova.accuracyMeters !== undefined) {
+      form.set('accuracyMeters', String(Math.round(prova.accuracyMeters)));
+    }
+    if (prova.capturedAt !== undefined) form.set('capturedAt', prova.capturedAt);
+    form.set('file', prova.ficheiro, prova.nome);
+
+    return request<{ proof: DeliveryProof }>(`/api/orders/${id}/proofs`, {
+      method: 'POST',
+      body: form,
+    });
+  },
 
   map: () => request<MapaOperacao>('/api/map/operation'),
   setOrderCoordinates: (id: string, ponto: { latitude: number; longitude: number }) =>
