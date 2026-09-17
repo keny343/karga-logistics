@@ -66,6 +66,12 @@
   border-radius: 2px;
 }
 
+/* And a driver is the ringed blue dot he is on the map. */
+.legenda__cor[data-kind='motorista'] {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
 .mapa-pagina__vazio {
   padding: var(--space-6) var(--space-4);
 }

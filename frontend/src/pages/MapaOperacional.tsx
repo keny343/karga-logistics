@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPinOff, RefreshCw } from 'lucide-react';
-import { api, type MapaOperacao, type PontoMapa } from '../api/client';
+import { api, type MapaOperacao, type PontoMapa, type PosicaoMotorista } from '../api/client';
+import { useEventoTempoReal, useRecarregarCom } from '../realtime/RealtimeContext';
+import { desdeQuando } from '../utils/format';
 import { ORDER_STATUSES, statusLabel, statusTone } from '../domain/orderStatus';
 import { useResource } from '../hooks/useResource';
 import { Button } from '../ui/Button';
@@ -110,18 +112,66 @@ const COLUNAS: readonly TableColumn<MapaOperacao['withoutCoordinates'][number]>[
 const LEGENDA: readonly {
   readonly tone: 'info' | 'warning' | 'danger' | 'neutral';
   readonly label: string;
-  readonly kind?: 'origem';
+  readonly kind?: 'origem' | 'motorista';
 }[] = [
   { tone: 'warning', label: 'Em armazém' },
   { tone: 'info', label: 'A caminho' },
   { tone: 'danger', label: 'Atrasada ou falhada' },
   { tone: 'neutral', label: 'Ponto de recolha', kind: 'origem' },
+  { tone: 'neutral', label: 'Motorista', kind: 'motorista' },
 ];
+
+const primeiroNome = (nome: string): string => nome.split(' ')[0] ?? nome;
+
+/**
+ * A position is what a phone claimed, and the popup says so: when it was reported and
+ * how wide the circle was. A pin drawn from a point with a 2 km radius is not where
+ * the driver is, and the operator deciding whether to call him needs to know which
+ * kind of point he is looking at.
+ */
+const popupDeMotorista = (posicao: PosicaoMotorista): string =>
+  [
+    `<span class="popup__codigo">${escapar(posicao.driverName)}</span>`,
+    posicao.orderCode !== undefined
+      ? `<span class="popup__linha">A transportar ${escapar(posicao.orderCode)}</span>`
+      : '<span class="popup__linha">Sem entrega activa</span>',
+    `<span class="popup__linha">Reportado ${escapar(desdeQuando(posicao.reportedAt))}</span>`,
+    posicao.accuracyMeters !== undefined
+      ? `<span class="popup__linha">Precisão ${escapar(String(posicao.accuracyMeters))} m</span>`
+      : '',
+    posicao.orderId !== undefined
+      ? `<a class="popup__ligacao" href="/encomendas/${posicao.orderId}" data-abrir="${posicao.orderId}">Abrir encomenda</a>`
+      : '',
+  ].join('');
 
 export const MapaOperacional = () => {
   const navegar = useNavigate();
   const [estado, setEstado] = useState('');
   const { data, loading, error, refreshing, reload } = useResource(() => api.map(), []);
+
+  /**
+   * Positions the socket has delivered since the page opened. They are kept apart from
+   * `data` on purpose: a driver reporting every ten seconds must not invalidate the
+   * orders the screen is showing, and the orders being refetched must not throw away a
+   * position that arrived in the meantime.
+   */
+  const [recebidas, setRecebidas] = useState<ReadonlyMap<string, PosicaoMotorista>>(new Map());
+
+  useEventoTempoReal<PosicaoMotorista>('motorista:posicao', (posicao) => {
+    setRecebidas((actuais) => new Map(actuais).set(posicao.driverId, posicao));
+  });
+
+  // The response is the fleet as it stood when the page loaded; anything that arrived
+  // afterwards is newer and wins.
+  const posicoes = useMemo(() => {
+    const juntas = new Map(data?.drivers.map((posicao) => [posicao.driverId, posicao]) ?? []);
+    for (const [id, posicao] of recebidas) juntas.set(id, posicao);
+    return juntas;
+  }, [data, recebidas]);
+
+  // Orders are refetched, positions are not: a parcel changing state may change which
+  // pins belong here, while a driver moving only moves one pin.
+  useRecarregarCom('encomenda:actualizada', reload);
 
   const visiveis = useMemo<readonly PontoMapa[]>(() => {
     if (data === null) return [];
@@ -157,6 +207,16 @@ export const MapaOperacional = () => {
       };
     });
 
+    const motoristas: MarcadorMapa[] = [...posicoes.values()].map((posicao) => ({
+      id: `motorista-${posicao.driverId}`,
+      latitude: posicao.latitude,
+      longitude: posicao.longitude,
+      tone: 'neutral',
+      label: primeiroNome(posicao.driverName),
+      kind: 'motorista',
+      popup: popupDeMotorista(posicao),
+    }));
+
     const origens: MarcadorMapa[] = data.origins.map((origem, indice) => ({
       id: `origem-${indice}`,
       latitude: origem.latitude,
@@ -169,8 +229,9 @@ export const MapaOperacional = () => {
       )}</span>`,
     }));
 
-    return [...origens, ...encomendas];
-  }, [data, visiveis]);
+    // Drivers last, so a courier is drawn over the parcel he is standing next to.
+    return [...origens, ...encomendas, ...motoristas];
+  }, [data, visiveis, posicoes]);
 
   // Only the states that are actually on the map, so the filter cannot offer an
   // option that empties it for no visible reason.

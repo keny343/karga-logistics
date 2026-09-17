@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LogOut, Menu, Package, X } from 'lucide-react';
 import { useSession } from '../auth/SessionContext';
+import { IndicadorLigacao } from '../realtime/IndicadorLigacao';
+import { useAvisosTempoReal } from '../realtime/useAvisos';
 import { iniciais } from '../utils/format';
 import { gruposPara } from './navigation';
 import './AppLayout.css';
@@ -17,6 +19,10 @@ export const AppLayout = () => {
   const { user, logout } = useSession();
   const localizacao = useLocation();
   const [drawerAberto, setDrawerAberto] = useState(false);
+
+  // Mounted once, here: a driver handed a delivery must hear about it wherever he is
+  // in the application.
+  useAvisosTempoReal();
 
   // Navigating on a phone must close the drawer, otherwise the new page arrives
   // hidden behind it.
@@ -121,6 +127,7 @@ export const AppLayout = () => {
             <strong>{user.companyName}</strong>
             <span>Luanda, Angola</span>
           </div>
+          <IndicadorLigacao />
           <span className="topo__avatar" title={user.email}>
             {iniciais(user.name)}
           </span>

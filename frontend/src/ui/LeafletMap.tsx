@@ -13,7 +13,7 @@ export interface MarcadorMapa {
   readonly label: string;
   /** Trusted HTML for the popup. Built by the caller from escaped values. */
   readonly popup: string;
-  readonly kind?: 'destino' | 'origem';
+  readonly kind?: 'destino' | 'origem' | 'motorista';
 }
 
 interface Props {
@@ -54,6 +54,10 @@ export const LeafletMap = ({
   const enquadramento = useRef<(() => void) | null>(null);
   /** Set once the operator pans or zooms; after that the view is theirs. */
   const mexido = useRef(false);
+  /** Live markers by id, so an update moves a pin instead of replacing it. */
+  const vivos = useRef(new Map<string, L.Marker>());
+  /** The marker set the current framing was chosen for. */
+  const enquadrado = useRef('');
   // Held in a ref so a new callback identity does not tear the map down.
   const escolher = useRef(onEscolherPonto);
   const abrir = useRef(onAbrir);
@@ -105,58 +109,83 @@ export const LeafletMap = ({
     camada.current = L.layerGroup().addTo(instancia);
     mapa.current = instancia;
 
+    const pinos = vivos.current;
+
     return () => {
       observador.disconnect();
       instancia.remove();
       mapa.current = null;
       camada.current = null;
+      pinos.clear();
     };
     // Deliberately once: the map is a long-lived object, and re-creating it on every
     // prop change would throw the operator's pan and zoom away mid-task.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const icone = (marcador: MarcadorMapa): L.DivIcon =>
+    L.divIcon({
+      className: marcador.kind === 'motorista' ? 'pino pino--motorista' : 'pino',
+      html: `<span class="pino__corpo" data-tone="${marcador.tone}" data-kind="${
+        marcador.kind ?? 'destino'
+      }">${marcador.label}</span>`,
+      iconSize: [76, 24],
+      iconAnchor: [38, 24],
+    });
+
   useEffect(() => {
     const instancia = mapa.current;
     const grupo = camada.current;
     if (instancia === null || grupo === null) return;
 
-    grupo.clearLayers();
+    const vistos = new Set<string>();
 
     for (const marcador of marcadores) {
+      vistos.add(marcador.id);
+      const existente = vivos.current.get(marcador.id);
+
+      // A marker that is still here is moved, not rebuilt. Clearing the layer on
+      // every update - which is what a naive implementation does - makes a live map
+      // flicker, closes the popup the operator was reading, and throws away the
+      // element the movement transition needs in order to be a movement.
+      if (existente !== undefined) {
+        existente.setLatLng([marcador.latitude, marcador.longitude]);
+        existente.setIcon(icone(marcador));
+        existente.setPopupContent(marcador.popup);
+        continue;
+      }
+
       const pino = L.marker([marcador.latitude, marcador.longitude], {
-        icon: L.divIcon({
-          className: 'pino',
-          html: `<span class="pino__corpo" data-tone="${marcador.tone}" data-kind="${
-            marcador.kind ?? 'destino'
-          }">${marcador.label}</span>`,
-          iconSize: [76, 24],
-          iconAnchor: [38, 24],
-        }),
+        icon: icone(marcador),
         title: marcador.label,
         // Keyboard users tab through the markers and open a popup with Enter.
         keyboard: true,
       });
 
       pino.bindPopup(marcador.popup);
-      if (abrir.current !== undefined) {
-        // The popup is plain HTML outside React's tree, so its links are wired by
-        // hand. Each one carries its own id, because a pin can stand for several
-        // parcels at the same address. They stay real `href`s: middle-clicking one
-        // to open a second order in a tab is something a dispatcher does.
-        pino.on('popupopen', () => {
-          const elemento = pino.getPopup()?.getElement();
-          for (const ligacao of elemento?.querySelectorAll('[data-abrir]') ?? []) {
-            ligacao.addEventListener('click', (evento) => {
-              evento.preventDefault();
-              const proprio = ligacao.getAttribute('data-abrir');
-              abrir.current?.(proprio !== null && proprio !== '' ? proprio : marcador.id);
-            });
-          }
-        });
-      }
+      // The popup is plain HTML outside React's tree, so its links are wired by hand.
+      // Each one carries its own id, because a pin can stand for several parcels at
+      // the same address. They stay real `href`s: middle-clicking one to open a
+      // second order in a tab is something a dispatcher does.
+      pino.on('popupopen', () => {
+        const elemento = pino.getPopup()?.getElement();
+        for (const ligacao of elemento?.querySelectorAll('[data-abrir]') ?? []) {
+          ligacao.addEventListener('click', (evento) => {
+            evento.preventDefault();
+            const proprio = ligacao.getAttribute('data-abrir');
+            abrir.current?.(proprio !== null && proprio !== '' ? proprio : marcador.id);
+          });
+        }
+      });
 
       pino.addTo(grupo);
+      vivos.current.set(marcador.id, pino);
+    }
+
+    for (const [id, pino] of vivos.current) {
+      if (vistos.has(id)) continue;
+      pino.remove();
+      vivos.current.delete(id);
     }
 
     // Frame what there is. With a single marker `fitBounds` would zoom to street
@@ -174,7 +203,14 @@ export const LeafletMap = ({
           ? () => instancia.setView([primeiro.latitude, primeiro.longitude], 14)
           : null;
 
-    enquadramento.current?.();
+    // Only when the set of markers changed, and only while the view is still the
+    // map's own choice. A driver reporting a new position every few seconds must not
+    // drag the view back every few seconds.
+    const assinatura = [...vistos].sort().join('|');
+    if (assinatura !== enquadrado.current && !mexido.current) {
+      enquadramento.current?.();
+      enquadrado.current = assinatura;
+    }
   }, [marcadores]);
 
   return (

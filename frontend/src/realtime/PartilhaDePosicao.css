@@ -1,0 +1,80 @@
+.partilha {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Green only once a point has actually been accepted, matching the wording. */
+.partilha[data-a-ver='true'] {
+  border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
+}
+
+.partilha[data-estado='sem-permissao'],
+.partilha[data-estado='sem-sinal'],
+.partilha[data-estado='sem-suporte'] {
+  border-color: color-mix(in srgb, var(--color-warning) 45%, transparent);
+}
+
+.partilha__cabeca {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.partilha__icone {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}
+
+.partilha[data-a-ver='true'] .partilha__icone {
+  color: var(--color-success);
+}
+
+.partilha__titulo {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.partilha__estado {
+  margin-top: 2px;
+  font-size: var(--text-small);
+  line-height: var(--text-small-lh);
+  color: var(--color-text-secondary);
+}
+
+.partilha__cabeca > button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.partilha__recusa {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-small);
+  color: var(--color-danger);
+}
+
+.partilha__letra-pequena {
+  margin-top: var(--space-3);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 639px) {
+  /* The button drops below the text: a 44px target next to two lines of copy leaves
+     neither enough room on a narrow phone. */
+  .partilha__cabeca {
+    flex-wrap: wrap;
+  }
+
+  .partilha__cabeca > button {
+    width: 100%;
+    margin-left: 0;
+  }
+}

@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, Package, Truck, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { useResource } from '../hooks/useResource';
+import { useRecarregarCom } from '../realtime/RealtimeContext';
 import { BarChart, type SerieBarra } from '../ui/BarChart';
 import { Card } from '../ui/Card';
 import { Distribution } from '../ui/Distribution';
@@ -38,6 +39,10 @@ const SERIE_CRIADAS: readonly SerieBarra[] = [{ label: 'Criadas', tone: 'primary
 export const Dashboard = () => {
   const navegar = useNavigate();
   const { data, loading, error, reload } = useResource(() => api.dashboard(), []);
+
+  // This is the screen left open on the wall. Counters that quietly stop counting are
+  // worse than no counters: the operation looks calm because nobody is being told.
+  useRecarregarCom('encomenda:actualizada', reload);
 
   return (
     <>

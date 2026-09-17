@@ -5,6 +5,8 @@ import { api, type OrderSummary } from '../api/client';
 import { ORDER_STATUSES, statusLabel } from '../domain/orderStatus';
 import { useResource } from '../hooks/useResource';
 import { useSession } from '../auth/SessionContext';
+import { PartilhaDePosicao } from '../realtime/PartilhaDePosicao';
+import { useRecarregarCom } from '../realtime/RealtimeContext';
 import { Badge, StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -93,6 +95,9 @@ export const Orders = () => {
     [estado, busca, atrasadas, pagina],
   );
 
+  // The list is the screen a dispatcher leaves open all day, so it keeps itself current.
+  useRecarregarCom('encomenda:actualizada', reload);
+
   const podeCriar = user?.role === 'ADMIN' || user?.role === 'OPERADOR';
 
   // The API narrows this list by role, so the sentence describing it has to say
@@ -117,6 +122,10 @@ export const Orders = () => {
           ) : undefined
         }
       />
+
+      {/* The driver's own screen, above his deliveries: this is the one thing on the
+          page that is about him rather than about a parcel. */}
+      {user?.role === 'MOTORISTA' ? <PartilhaDePosicao /> : null}
 
       <Card padded={false}>
         <form

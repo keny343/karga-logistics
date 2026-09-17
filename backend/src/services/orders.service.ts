@@ -1,6 +1,7 @@
 import { transaction } from '../config/database.js';
 import { assegurarPontoEmAngola, type Ponto } from '../domain/geografia.js';
-import { assegurarTransicao, isFinal, type OrderStatus } from '../domain/orderStatus.js';
+import { publicar } from '../realtime/bus.js';
+import { assegurarTransicao, isFinal, statusLegivel, type OrderStatus } from '../domain/orderStatus.js';
 import * as motoristas from '../repositories/drivers.repository.js';
 import * as encomendas from '../repositories/orders.repository.js';
 import { registarAuditoria } from './audit.service.js';
@@ -14,6 +15,33 @@ export interface Contexto {
 }
 
 const autorDe = (auth: Autenticado) => ({ id: auth.userId, label: `${auth.name} (${auth.email})` });
+
+type Detalhe = Awaited<ReturnType<typeof detalhe>>;
+
+/**
+ * Tells the browsers that care. Operators always, because dispatch is their screen;
+ * the driver carrying the parcel and the customer waiting for it, when there is one,
+ * each in their own room.
+ *
+ * It runs after the write has committed and its failure is not the caller's problem:
+ * a delivery that was recorded must not fail because a socket was down.
+ */
+const anunciar = (
+  companyId: string,
+  encomenda: Detalhe,
+  motivo: 'criada' | 'atribuida' | 'estado',
+): void => {
+  publicar(
+    {
+      companyId,
+      operacao: true,
+      ...(encomenda.driverId !== undefined ? { driverId: encomenda.driverId } : {}),
+      customerId: encomenda.customerId,
+    },
+    'encomenda:actualizada',
+    { motivo, order: encomenda },
+  );
+};
 
 const encomendaOuNada = async (companyId: string, orderId: string) => {
   const linha = await encomendas.porId(companyId, orderId);
@@ -43,7 +71,9 @@ export const criar = async (contexto: Contexto, dados: encomendas.NovaEncomenda)
     requestId: contexto.requestId,
   });
 
-  return detalhe(contexto.auth.companyId, orderId);
+  const criada = await detalhe(contexto.auth.companyId, orderId);
+  anunciar(contexto.auth.companyId, criada, 'criada');
+  return criada;
 };
 
 const violaUmaEntregaPorMotorista = (erro: unknown) =>
@@ -125,7 +155,19 @@ export const atribuirMotorista = async (
     requestId: contexto.requestId,
   });
 
-  return detalhe(companyId, orderId);
+  const atribuida = await detalhe(companyId, orderId);
+  anunciar(companyId, atribuida, 'atribuida');
+
+  // The driver is told, by name, on the phone he is holding. This is the one event
+  // somebody has to act on rather than merely see, so it is a message of its own
+  // instead of a row that changed colour in a list he may not be looking at.
+  publicar({ companyId, driverId }, 'aviso', {
+    tipo: 'entrega:atribuida',
+    mensagem: `Nova entrega: ${atribuida.code} para ${atribuida.customerName}, ${atribuida.destination}.`,
+    orderId,
+  });
+
+  return atribuida;
 };
 
 /**
@@ -250,5 +292,18 @@ export const mudarEstado = async (
     requestId: contexto.requestId,
   });
 
-  return detalhe(companyId, orderId);
+  const actualizada = await detalhe(companyId, orderId);
+  anunciar(companyId, actualizada, 'estado');
+
+  // A driver moving his own parcel already knows; the operators are the ones who
+  // need to be told, and a failed delivery is the one they need to see immediately.
+  if (contexto.auth.role === 'MOTORISTA') {
+    publicar({ companyId, operacao: true }, 'aviso', {
+      tipo: para === 'FALHA_ENTREGA' ? 'entrega:falhou' : 'entrega:progresso',
+      mensagem: `${actualizada.code}: ${statusLegivel(para)} por ${contexto.auth.name}.`,
+      orderId,
+    });
+  }
+
+  return actualizada;
 };

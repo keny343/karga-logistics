@@ -20,6 +20,7 @@ const unico = (): string => {
 
 /** Order matters: children before parents. */
 export const limparBase = async (): Promise<void> => {
+  await query('DELETE FROM driver_positions');
   await query('DELETE FROM order_status_history');
   await query('DELETE FROM orders');
   await query('DELETE FROM drivers');

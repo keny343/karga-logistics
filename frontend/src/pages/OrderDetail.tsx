@@ -10,6 +10,7 @@ import {
 } from '../domain/orderStatus';
 import { useResource } from '../hooks/useResource';
 import { useSession } from '../auth/SessionContext';
+import { useAoReligar, useEventoTempoReal } from '../realtime/RealtimeContext';
 import { Badge, StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -89,6 +90,15 @@ export const OrderDetail = () => {
   const aviso = useToast();
   const { user } = useSession();
   const { data, loading, error, reload } = useResource(() => api.order(id), [id]);
+
+  // An operator following a delivery keeps this page open. When the driver marks the
+  // parcel collected, the timeline has to show it without a reload — and the event
+  // reaches this browser for any order in the company, so the page checks it is about
+  // the one being watched before asking again.
+  useEventoTempoReal<{ order: { id: string } }>('encomenda:actualizada', (evento) => {
+    if (evento.order.id === id) reload();
+  });
+  useAoReligar(reload);
 
   const [aMudar, setAMudar] = useState<OrderStatus | null>(null);
   const [nota, setNota] = useState('');

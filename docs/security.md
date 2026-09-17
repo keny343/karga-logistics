@@ -124,6 +124,42 @@ address snapshot on the row; letting a map click change them after delivery woul
 rewrite where a parcel actually went. Every accepted change is audited with the
 point.
 
+## Realtime
+
+**The socket is authenticated by the session, not by a token of its own.** The
+handshake reads the same cookie and calls the same `resolverSessao` the HTTP
+middleware calls. Adding a second credential path — a query-string token, a
+"socket key" — would mean a second thing to get wrong, and the weaker of the two is
+the one an attacker uses.
+
+**Narrowing happens at subscribe time, not in the payload.** Every room name begins
+with the company id, and a client joins its rooms once, at connect, from its own
+session. There is no message a client can send to join a room, because that message
+is a request to name somebody else's. Filtering a payload after it arrives in the
+wrong browser is not filtering: it has already leaked.
+
+**A driver reports only his own position.** The driver id comes from the session; the
+message carries the point and nothing else. A socket cannot place a colleague
+somewhere he is not.
+
+**Positions reach the people dispatching and nobody else.** Not other drivers, whose
+whereabouts are none of each other's business, and not customers — following a parcel
+is a narrower thing than watching a person move, and it will get its own payload if it
+is ever built.
+
+**Sharing is the driver's decision, every time.** Nothing reports automatically, the
+page says what it costs before he agrees, and the interface never claims the office can
+see him until the server has acknowledged a point. Telling a courier he is visible when
+he is not is the failure in this feature that leaves somebody waiting on a roadside.
+
+**A revoked session drops its sockets.** Live connections are re-checked every two
+minutes and disconnected if the session is gone, so logging out — or an account being
+retired — takes effect on the socket and not only on the next request.
+
+**Incoming points are validated like any other input.** Type, finiteness, and inside
+Angola, including the swapped-pair case. Ingestion is rate limited per socket in the
+server, so a compromised or buggy client cannot turn a phone into a write loop.
+
 ## Phase 7 (uploads)
 
 Proof-of-delivery photos will be validated on MIME type, extension, size and

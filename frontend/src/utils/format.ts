@@ -49,6 +49,26 @@ export const formatQuando = (iso: string): string => {
 };
 
 /**
+ * How long ago, in the words somebody would use out loud. A live position is only
+ * useful next to its age: "há 12 minutos" is the difference between a courier who is
+ * moving and one whose phone stopped reporting.
+ */
+export const desdeQuando = (iso: string): string => {
+  const segundos = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+
+  if (segundos < 45) return 'agora mesmo';
+  if (segundos < 90) return 'há 1 minuto';
+
+  const minutos = Math.round(segundos / 60);
+  if (minutos < 60) return `há ${minutos} minutos`;
+
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return horas === 1 ? 'há 1 hora' : `há ${horas} horas`;
+
+  return formatQuando(iso).toLowerCase();
+};
+
+/**
  * A duration in minutes as an operator says it: "2h 15" rather than "135 min".
  * Anything under an hour keeps the minutes, because that is the useful precision
  * for a delivery inside a city.

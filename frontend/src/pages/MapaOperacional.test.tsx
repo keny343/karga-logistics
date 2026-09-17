@@ -1,10 +1,32 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MapaOperacao, PontoMapa } from '../api/client';
+import { RealtimeProvider } from '../realtime/RealtimeContext';
+import { criarSocketFalso, type SocketFalso } from '../test/socketFalso';
 import { MapaOperacional } from './MapaOperacional';
 import type { MarcadorMapa } from '../ui/LeafletMap';
+
+let socket: SocketFalso;
+
+vi.mock('socket.io-client', () => ({ io: () => socket }));
+
+vi.mock('../auth/SessionContext', () => ({
+  useSession: () => ({
+    user: {
+      id: 'u1',
+      name: 'Bia Op',
+      email: 'bia@karga.ao',
+      role: 'OPERADOR',
+      companyId: 'c1',
+      companyName: 'Karga',
+    },
+    loading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
 
 /**
  * Leaflet is replaced by something that renders its markers as text. What is worth
@@ -45,6 +67,8 @@ const RESPOSTA: MapaOperacao = {
       longitude: 13.3672,
     },
   ],
+  drivers: [],
+  positionFreshnessMinutes: 15,
   withoutCoordinates: [],
   center: { latitude: -8.8383, longitude: 13.2344 },
 };
@@ -62,12 +86,20 @@ const montar = (corpo: unknown, status = 200) => {
 
   render(
     <MemoryRouter>
-      <MapaOperacional />
+      <RealtimeProvider>
+        <MapaOperacional />
+      </RealtimeProvider>
     </MemoryRouter>,
   );
 
+  act(() => socket.receber('connect'));
+
   return fetchMock;
 };
+
+beforeEach(() => {
+  socket = criarSocketFalso();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -180,6 +212,75 @@ describe('MapaOperacional', () => {
       await screen.findByText('Nenhuma encomenda em curso com ponto no mapa.'),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('mapa')).not.toBeInTheDocument();
+  });
+
+  it('draws the fleet the response carried, so a fresh page is not empty', async () => {
+    montar({
+      ...RESPOSTA,
+      drivers: [
+        {
+          driverId: 'd1',
+          driverName: 'Manuel Costa',
+          latitude: -8.85,
+          longitude: 13.24,
+          accuracyMeters: 18,
+          orderCode: 'KRG-000001',
+          reportedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    const mapa = await screen.findByTestId('mapa');
+    // First name only: a pin is 76 pixels wide and "Manuel" is what an operator says.
+    expect(within(mapa).getByText('Manuel')).toHaveAttribute('data-kind', 'motorista');
+  });
+
+  it('moves a driver when his position arrives, without asking the API again', async () => {
+    const fetchMock = montar(RESPOSTA);
+    await screen.findByTestId('mapa');
+    const chamadas = fetchMock.mock.calls.length;
+
+    act(() =>
+      socket.receber('motorista:posicao', {
+        driverId: 'd1',
+        driverName: 'Manuel Costa',
+        latitude: -8.85,
+        longitude: 13.24,
+        reportedAt: new Date().toISOString(),
+      }),
+    );
+
+    expect(within(screen.getByTestId('mapa')).getByText('Manuel')).toBeInTheDocument();
+
+    act(() =>
+      socket.receber('motorista:posicao', {
+        driverId: 'd1',
+        driverName: 'Manuel Costa',
+        latitude: -8.86,
+        longitude: 13.25,
+        reportedAt: new Date().toISOString(),
+      }),
+    );
+
+    // One driver, one pin, wherever he goes — and a position moving every ten seconds
+    // must not drag the orders down from the API with it.
+    expect(within(screen.getByTestId('mapa')).getAllByText('Manuel')).toHaveLength(1);
+    expect(fetchMock.mock.calls.length).toBe(chamadas);
+  });
+
+  it('asks for the orders again when one of them changed', async () => {
+    const fetchMock = montar(RESPOSTA);
+    await screen.findByTestId('mapa');
+    const chamadas = fetchMock.mock.calls.length;
+
+    act(() => socket.receber('encomenda:actualizada', { motivo: 'estado', order: { id: '1' } }));
+
+    // Whether the parcel still belongs on this map, in which group, and under the
+    // current filter is a question about all of them, so the page asks. The refetch is
+    // held for a moment first, which is why this waits instead of asserting at once.
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(chamadas);
+    });
   });
 
   it('explains a failure with the request id and offers a retry', async () => {

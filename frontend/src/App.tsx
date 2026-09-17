@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SessionProvider, useSession } from './auth/SessionContext';
+import { RealtimeProvider } from './realtime/RealtimeContext';
 import { AppLayout } from './layout/AppLayout';
 import { Customers } from './pages/Customers';
 import { Dashboard } from './pages/Dashboard';
@@ -64,56 +65,59 @@ const PaginaInicial = () => {
 export const App = () => (
   <SessionProvider>
     <ToastProvider>
-      <Routes>
-        <Route path="/entrar" element={<Login />} />
-        <Route path="/estado" element={<SystemStatus />} />
+      {/* Inside the toasts: a realtime notice is shown as one. */}
+      <RealtimeProvider>
+        <Routes>
+          <Route path="/entrar" element={<Login />} />
+          <Route path="/estado" element={<SystemStatus />} />
 
-        <Route
-          element={
-            <Protegida>
-              <AppLayout />
-            </Protegida>
-          }
-        >
-          <Route index element={<PaginaInicial />} />
-          <Route path="encomendas" element={<Orders />} />
-          <Route path="encomendas/:id" element={<OrderDetail />} />
           <Route
-            path="clientes"
             element={
-              <Protegida roles={OPERACAO}>
-                <Customers />
+              <Protegida>
+                <AppLayout />
               </Protegida>
             }
-          />
-          <Route
-            path="motoristas"
-            element={
-              <Protegida roles={OPERACAO}>
-                <Drivers />
-              </Protegida>
-            }
-          />
-          <Route
-            path="mapa"
-            element={
-              <Suspense fallback={<LoadingState rows={4} />}>
-                <MapaOperacional />
-              </Suspense>
-            }
-          />
-          <Route
-            path="relatorios"
-            element={
-              <Protegida roles={OPERACAO}>
-                <Reports />
-              </Protegida>
-            }
-          />
-        </Route>
+          >
+            <Route index element={<PaginaInicial />} />
+            <Route path="encomendas" element={<Orders />} />
+            <Route path="encomendas/:id" element={<OrderDetail />} />
+            <Route
+              path="clientes"
+              element={
+                <Protegida roles={OPERACAO}>
+                  <Customers />
+                </Protegida>
+              }
+            />
+            <Route
+              path="motoristas"
+              element={
+                <Protegida roles={OPERACAO}>
+                  <Drivers />
+                </Protegida>
+              }
+            />
+            <Route
+              path="mapa"
+              element={
+                <Suspense fallback={<LoadingState rows={4} />}>
+                  <MapaOperacional />
+                </Suspense>
+              }
+            />
+            <Route
+              path="relatorios"
+              element={
+                <Protegida roles={OPERACAO}>
+                  <Reports />
+                </Protegida>
+              }
+            />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </RealtimeProvider>
     </ToastProvider>
   </SessionProvider>
 );

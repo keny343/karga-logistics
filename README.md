@@ -3,13 +3,15 @@
 Last-mile delivery operations for a carrier working in Luanda: orders, drivers,
 assignment, live tracking and proof of delivery.
 
-> **Status: phases 1 to 5 of 9.** Sessions, roles and company isolation are in
+> **Status: phases 1 to 6 of 9.** Sessions, roles and company isolation are in
 > place; customers, drivers and orders work end to end, driven by a state machine
 > with an audited history; the operator has a dashboard whose numbers link to the
 > lists behind them, an order list with filters, an order detail with a timeline and
 > the actions the domain allows, a report over any window with a CSV export, and a
-> map of the parcels in play that also names the ones it cannot draw. Realtime
-> tracking and proof of delivery are the phases that follow. Nothing in this README
+> map of the parcels in play that also names the ones it cannot draw. The screens
+> now keep themselves current over a socket, drivers appear on the map while they
+> move if they choose to share their position, and the person who has to act is told
+> rather than left to notice. Proof of delivery is next. Nothing in this README
 > describes something that is not in the repository — the roadmap below marks what
 > exists and what does not.
 
@@ -67,7 +69,7 @@ and the database carries the same rule as a `CHECK` constraint.
 | Frontend  | React 19, TypeScript, Vite, React Router |
 | Backend   | Node.js, TypeScript, Express 5 |
 | Database  | PostgreSQL 17 |
-| Realtime  | Socket.IO *(phase 6)* |
+| Realtime  | Socket.IO |
 | Maps      | Leaflet + OpenStreetMap |
 | Tests     | Vitest, Supertest, Testing Library |
 | CI        | GitHub Actions: lint, typecheck, tests, build |
@@ -121,8 +123,8 @@ docker compose up
 ## Tests
 
 ```bash
-cd backend  && npm test    # 125 tests
-cd frontend && npm test    # 39 tests
+cd backend  && npm test    # 147 tests
+cd frontend && npm test    # 61 tests
 ```
 
 The backend suite runs against a real PostgreSQL, not mocks: what is worth
@@ -135,9 +137,19 @@ creation to delivery. Reports are tested for what falls inside a window and what
 not, for the median rather than the mean, and for the CSV rules — escaping, and the
 neutralisation of a value a spreadsheet would execute. The map is tested for the
 scope each role gets, for the orders it reports as undrawable, and for the two
-refusals that matter: a swapped coordinate pair and a finished order. The frontend
-suite covers the screens' loading, empty and error states against a stubbed API, and
-tests the map by what it asks Leaflet to draw rather than by rendering tiles.
+refusals that matter: a swapped coordinate pair and a finished order.
+
+The realtime tests start a real server and connect real clients, because who receives
+what lives in the handshake, the rooms and the session — none of which a mocked socket
+would exercise. They assert the things that would be quiet failures: that a socket with
+no session is refused, that an event never crosses into another company, that one driver
+never sees another, that a position from a browser is validated and rate limited, and
+that logging out closes the sockets left open elsewhere.
+
+The frontend suite covers the screens' loading, empty and error states against a stubbed
+API, tests the map by what it asks Leaflet to draw rather than by rendering tiles, and
+tests the driver's position sharing against a fake geolocation — including the states
+where it should refuse to claim it is working.
 
 The backend suite needs a database. It defaults to `karga_test` on localhost and
 honours `TEST_DATABASE_URL`.
@@ -175,7 +187,9 @@ Available today: probes (`GET /health`, `GET /ready`), sessions
 dashboard aggregate, orders (list, create, read, assign, change state, set
 destination coordinates), customers, drivers, reports
 (`GET /api/reports/summary`, `GET /api/reports/orders.csv`) and the map
-(`GET /api/map/operation`). Full contract in [docs/api.md](docs/api.md).
+(`GET /api/map/operation`). Live updates arrive over Socket.IO on `/realtime`,
+authenticated by the same session cookie. Full contract in
+[docs/api.md](docs/api.md).
 
 ## Documentation
 
@@ -193,8 +207,8 @@ destination coordinates), customers, drivers, reports
 | 3 | Customers, drivers, orders, state machine, assignment | **done** |
 | 4 | Reports, CSV export, dashboard that leads somewhere | **done** |
 | 5 | Coordinates and the operational map | **done** |
-| 6 | Socket.IO: driver location, delivery updates, notifications | next |
-| 7 | Proof of delivery: photo, signature, timestamp, location | — |
+| 6 | Socket.IO: driver location, delivery updates, notifications | **done** |
+| 7 | Proof of delivery: photo, signature, timestamp, location | next |
 | 8 | Hardening: audit, performance, security review | — |
 | 9 | Deployment, screenshots, release | — |
 
@@ -281,8 +295,53 @@ file: Leaflet owns the DOM inside the container, React owns the container.
 
 **The map is loaded on demand.** Leaflet and its stylesheet are a third of the
 application's weight and are needed by two screens, so they are a separate chunk:
-103 kB gzipped for everyone, 44 kB more only for whoever opens a map. A driver
-checking his list on a phone connection should not pay for it.
+119 kB gzipped for everyone, 45 kB more only for whoever opens a map. A driver
+checking his list on a phone connection should not pay for it. The socket client is
+in the main bundle and costs around 15 kB of that figure — it is not split, because
+every signed-in screen uses it and a lazy chunk would only delay the connection.
+
+**The socket is authenticated by the session cookie, not by a token of its own.** The
+handshake resolves the same cookie with the same function the HTTP middleware uses. A
+second credential path would be a second thing to get wrong, and an attacker uses the
+weaker of the two.
+
+**Rooms are assigned at connect, from the session; a client cannot subscribe.** Every
+room name starts with the company id, and there is no message that joins one, because
+such a message is a request to name somebody else's room. Narrowing after a payload
+arrives in the wrong browser is not narrowing.
+
+**Services publish through a bus, not through the socket server.** The HTTP path works
+identically with no realtime attached — the suite runs that way, and so would a deploy
+with the socket layer down. A publish is fire-and-forget: a delivery that was recorded
+must not fail because a browser could not be told.
+
+**Events say something changed; the screen asks the API what.** A payload could be
+patched into a row, but whether the order still belongs in this filter, on this page or
+in that map group is a question about all of them. Bursts are collapsed into one
+refetch, and reconnecting triggers one too — a socket that was down has missed events
+and cannot know which.
+
+**Only the driver's last position is stored, upserted, with no trail.** A point every
+ten seconds is some nine thousand rows per driver per day, and no screen answers a
+question that needs the history. When one exists it gets its own table sampled for that
+question, rather than inheriting the rate a phone happened to report at.
+
+**A position is drawn as a claim, not a fact.** It carries the accuracy the phone
+reported and the moment it arrived, both shown in the popup, and anything older than
+fifteen minutes is not drawn at all: by then the courier may have finished, gone home,
+or closed the page that was reporting.
+
+**Position sharing is opt-in, per session, and says what it costs.** A phone that
+reports its location without being asked is surveillance, whoever owns it. The card
+states that it works only while the page is open — a browser stops watching when the tab
+goes away — and that it sends a point every ten seconds, which on a data bundle bought
+by the megabyte is information a driver is owed before agreeing. It refuses to say the
+office can see him until the server has acknowledged a point.
+
+**A dead socket is visible.** A dispatcher watching a list that has quietly stopped
+changing believes the operation is calm, so the header always says whether the screens
+are updating themselves. The distinction between "nothing is happening" and "I am no
+longer being told" is the whole reason the indicator exists.
 
 **Probes registered before CORS.** A misconfigured origin list must not be able to
 make the service look dead to the platform hosting it.

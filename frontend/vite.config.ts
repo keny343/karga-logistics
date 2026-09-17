@@ -23,6 +23,9 @@ export default defineConfig({
       // and answer with index.html instead of the API's JSON.
       '/health': paraApi,
       '/ready': paraApi,
+      // The socket needs `ws` as well as the target: without it the upgrade request
+      // is proxied as plain HTTP and the connection silently falls back to polling.
+      '/realtime': { ...paraApi, ws: true },
     },
   },
   test: {

@@ -4,17 +4,28 @@ import './Toast.css';
 
 type Tipo = 'success' | 'error' | 'info';
 
+/**
+ * One optional action. A notification that says a delivery was assigned is worth
+ * more with the way to open it, and more than one button turns a passing message
+ * into a decision.
+ */
+export interface AccaoAviso {
+  readonly label: string;
+  readonly onClick: () => void;
+}
+
 interface Aviso {
   readonly id: number;
   readonly tipo: Tipo;
   readonly mensagem: string;
+  readonly accao?: AccaoAviso;
 }
 
 interface Contexto {
-  readonly sucesso: (mensagem: string) => void;
+  readonly sucesso: (mensagem: string, accao?: AccaoAviso) => void;
   /** Errors state the problem, never just "erro". */
-  readonly erro: (mensagem: string) => void;
-  readonly info: (mensagem: string) => void;
+  readonly erro: (mensagem: string, accao?: AccaoAviso) => void;
+  readonly info: (mensagem: string, accao?: AccaoAviso) => void;
 }
 
 const ToastContext = createContext<Contexto | null>(null);
@@ -36,9 +47,12 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   }, []);
 
   const adicionar = useCallback(
-    (tipo: Tipo, mensagem: string) => {
+    (tipo: Tipo, mensagem: string, accao?: AccaoAviso) => {
       const id = Date.now() + Math.random();
-      setAvisos((actuais) => [...actuais, { id, tipo, mensagem }]);
+      setAvisos((actuais) => [
+        ...actuais,
+        { id, tipo, mensagem, ...(accao !== undefined ? { accao } : {}) },
+      ]);
       const duracao = DURACAO[tipo];
       if (duracao !== null) setTimeout(() => remover(id), duracao);
     },
@@ -47,9 +61,9 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
 
   const valor = useMemo<Contexto>(
     () => ({
-      sucesso: (mensagem) => adicionar('success', mensagem),
-      erro: (mensagem) => adicionar('error', mensagem),
-      info: (mensagem) => adicionar('info', mensagem),
+      sucesso: (mensagem, accao) => adicionar('success', mensagem, accao),
+      erro: (mensagem, accao) => adicionar('error', mensagem, accao),
+      info: (mensagem, accao) => adicionar('info', mensagem, accao),
     }),
     [adicionar],
   );
@@ -69,6 +83,18 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
             >
               <Icone size={18} className="toast__icone" aria-hidden="true" />
               <p className="toast__texto">{aviso.mensagem}</p>
+              {aviso.accao !== undefined ? (
+                <button
+                  type="button"
+                  className="toast__accao"
+                  onClick={() => {
+                    aviso.accao?.onClick();
+                    remover(aviso.id);
+                  }}
+                >
+                  {aviso.accao.label}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="toast__fechar"

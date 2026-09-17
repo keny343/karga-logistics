@@ -1,0 +1,55 @@
+.ligacao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.ligacao[data-estado='ligado'] {
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  background: var(--color-success-soft);
+  /* Darkened against the soft background: the token's own green fails contrast on it. */
+  color: color-mix(in srgb, var(--color-success) 75%, #000);
+}
+
+.ligacao[data-estado='desligado'] {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  background: var(--color-warning-soft);
+  color: color-mix(in srgb, var(--color-warning) 80%, #000);
+}
+
+.ligacao[data-estado='ligado'] svg {
+  /* A slow pulse reads as "live" without becoming something that pulls the eye off
+     the operation. */
+  animation: ligacao-pulso 2.4s ease-in-out infinite;
+}
+
+@keyframes ligacao-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ligacao[data-estado='ligado'] svg {
+    animation: none;
+  }
+}
+
+@media (max-width: 639px) {
+  /* On a phone the header is tight; the icon and colour carry it, and the screen
+     reader text is unaffected. */
+  .ligacao__texto {
+    display: none;
+  }
+}

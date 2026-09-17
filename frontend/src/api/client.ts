@@ -242,8 +242,23 @@ export interface PontoMapa {
   readonly late: boolean;
 }
 
+export interface PosicaoMotorista {
+  readonly driverId: string;
+  readonly driverName: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  /** The radius the phone claimed. A point with a 2 km radius is not a location. */
+  readonly accuracyMeters?: number;
+  readonly orderId?: string;
+  readonly orderCode?: string;
+  readonly reportedAt: string;
+}
+
 export interface MapaOperacao {
   readonly items: readonly PontoMapa[];
+  /** The fleet as it stood when the page opened; the socket carries it from there. */
+  readonly drivers: readonly PosicaoMotorista[];
+  readonly positionFreshnessMinutes: number;
   readonly origins: readonly {
     readonly description: string;
     readonly municipality: string;

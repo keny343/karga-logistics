@@ -55,6 +55,30 @@
   border-radius: var(--radius-sm);
 }
 
+/* A driver is a person, not a place: the primary blue, a name instead of a code, and
+ * a ring so it reads as a moving thing over the parcels underneath. */
+.pino__corpo[data-kind='motorista'] {
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent),
+    var(--shadow-card);
+}
+
+/* Movement is animated by Leaflet's own transform; a transition on it makes a
+ * position update read as travel rather than as teleporting. */
+.pino--motorista {
+  transition: transform 600ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pino--motorista {
+    transition: none;
+  }
+}
+
 .leaflet-container {
   font-family: var(--font-sans);
   font-size: var(--text-small);
