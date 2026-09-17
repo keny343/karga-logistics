@@ -74,6 +74,42 @@ export const atribuicaoSchema = z.object({
 
 export const idSchema = z.string().uuid('Identificador inválido.');
 
+const DIA = /^\d{4}-\d{2}-\d{2}$/;
+const MAXIMO_DIAS = 366;
+
+const dia = z
+  .string()
+  .trim()
+  .regex(DIA, 'Usa uma data no formato AAAA-MM-DD.')
+  // `2026-02-31` matches the pattern and is not a date; the round trip catches it.
+  .refine((valor) => new Date(`${valor}T00:00:00Z`).toISOString().startsWith(valor), {
+    message: 'Data inexistente.',
+  });
+
+/**
+ * A report window is two Luanda dates, both inclusive. The range is bounded: an
+ * open-ended report is a table scan somebody will run by accident, and a year is
+ * already more than an operator reads on a screen.
+ */
+export const intervaloSchema = z
+  .object({ from: dia, to: dia })
+  .refine((valores) => valores.from <= valores.to, {
+    message: 'A data inicial não pode ser posterior à final.',
+    path: ['from'],
+  })
+  .refine(
+    (valores) =>
+      (Date.parse(`${valores.to}T00:00:00Z`) - Date.parse(`${valores.from}T00:00:00Z`)) /
+        86_400_000 <
+      MAXIMO_DIAS,
+    { message: `O intervalo não pode exceder ${MAXIMO_DIAS} dias.`, path: ['to'] },
+  );
+
+export const exportacaoSchema = z.intersection(
+  intervaloSchema,
+  z.object({ status: z.string().trim().max(40).optional() }),
+);
+
 /** Page size is capped so a caller cannot ask for the whole table in one request. */
 export const filtrosSchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),

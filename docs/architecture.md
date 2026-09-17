@@ -100,6 +100,18 @@ is a parcel nobody is responsible for.
 An order is locked with `SELECT … FOR UPDATE` for the duration of a transition, so
 two operators clicking at once cannot both read `PRONTO` and both write.
 
+## Aggregates
+
+Reporting has a repository and a controller, and no service: there are no rules to
+enforce, only counting, and a layer that forwards a call unchanged is a layer that
+hides where the work happens. Every aggregate counts in the database rather than
+loading rows into Node — a busy month is tens of thousands of orders and the answer
+is a handful of numbers.
+
+The only decision the reporting controller makes is one SQL cannot: with nothing
+finished in the window, the success rate is `null` rather than zero, because those
+two statements mean very different things to whoever reads the screen.
+
 ## Frontend
 
 ```
@@ -117,6 +129,11 @@ main ──> SessionProvider ──> ToastProvider ──> router ──> AppLay
   for that answer instead of flashing the login screen at a signed-in user.
 - **`domain/orderStatus.ts`** — status labels and their semantic tone, so the same
   status is never green on one screen and blue on another.
+- **charts** — `ui/BarChart` and `ui/Distribution` are shared by the dashboard and
+  the reports screen. They draw in CSS: a charting library would add a hundred
+  kilobytes to render a few dozen rectangles. The bars are `aria-hidden` and the
+  same numbers are emitted as a visually hidden table, which is the honest way to
+  make a chart readable by a screen reader.
 
 Route guards are convenience. The interface hides what a role may not do; the API
 refuses it regardless.

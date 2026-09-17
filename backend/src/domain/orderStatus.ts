@@ -42,6 +42,29 @@ export const TRANSICOES: Readonly<Record<OrderStatus, readonly OrderStatus[]>> =
   DEVOLVIDO: [],
 };
 
+/**
+ * Labels for output the server writes itself — today, the CSV export, where
+ * `FALHA_ENTREGA` in a cell an operator reads is not acceptable. The interface has
+ * its own copy of this map: it is the same eleven words, but one feeds a screen and
+ * the other a file generated without a browser, and sharing it would mean the API
+ * dictating presentation.
+ */
+export const ETIQUETAS: Readonly<Record<OrderStatus, string>> = {
+  CRIADO: 'Criado',
+  CONFIRMADO: 'Confirmado',
+  PREPARANDO: 'Em preparação',
+  PRONTO: 'Pronto',
+  ATRIBUIDO: 'Atribuído',
+  RECOLHIDO: 'Recolhido',
+  EM_ENTREGA: 'Em entrega',
+  ENTREGUE: 'Entregue',
+  CANCELADO: 'Cancelado',
+  FALHA_ENTREGA: 'Falha na entrega',
+  DEVOLVIDO: 'Devolvido',
+};
+
+export const statusLegivel = (status: OrderStatus): string => ETIQUETAS[status];
+
 /** States a driver must already be attached to. */
 export const EXIGEM_MOTORISTA: readonly OrderStatus[] = [
   'ATRIBUIDO',

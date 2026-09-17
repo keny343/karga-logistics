@@ -1,0 +1,112 @@
+.grafico-barras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.grafico-barras__legenda {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.grafico-barras__legenda li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.grafico-barras__legenda span {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+}
+
+.grafico-barras__legenda span[data-tone='primary'] {
+  background: var(--color-primary);
+}
+
+.grafico-barras__legenda span[data-tone='success'] {
+  background: var(--color-success);
+}
+
+.grafico-barras__area {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 180px;
+}
+
+.grafico-barras__coluna {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Series stand side by side rather than stacked: created and delivered are two
+ * measurements of the same day, not two parts of one total. */
+.grafico-barras__pilha {
+  flex: 1;
+  width: 100%;
+  max-width: 32px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.grafico-barras__barra {
+  flex: 1;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: height 160ms ease;
+}
+
+.grafico-barras__barra[data-tone='primary'] {
+  background: var(--color-primary);
+}
+
+.grafico-barras__barra[data-tone='success'] {
+  background: var(--color-success);
+}
+
+.grafico-barras__coluna:hover .grafico-barras__barra[data-tone='primary'] {
+  background: var(--color-primary-dark);
+}
+
+.grafico-barras__valor {
+  font-size: var(--text-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.grafico-barras__rotulo {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  /* An unlabelled column keeps the row: without this its bar drops a line lower
+   * than its labelled neighbours and the baseline of the chart looks broken. */
+  min-height: 1rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .grafico-barras__area {
+    height: 140px;
+    /* Bars get thinner rather than disappearing. Hiding the oldest columns would
+     * silently change what the chart says, and the caller is the only one that
+     * knows how many days are worth drawing. */
+    gap: 3px;
+  }
+
+  .grafico-barras__rotulo {
+    font-size: 0.625rem;
+  }
+}

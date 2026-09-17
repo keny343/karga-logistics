@@ -48,6 +48,23 @@ export const formatQuando = (iso: string): string => {
   return mesmoDia ? `Hoje ${HORA.format(data)}` : DATA_HORA.format(data);
 };
 
+/**
+ * A duration in minutes as an operator says it: "2h 15" rather than "135 min".
+ * Anything under an hour keeps the minutes, because that is the useful precision
+ * for a delivery inside a city.
+ */
+export const formatDuracao = (minutos: number | null): string => {
+  if (minutos === null) return '—';
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto === 0 ? `${horas}h` : `${horas}h ${String(resto).padStart(2, '0')}`;
+};
+
+/** A Luanda date in the `AAAA-MM-DD` form the report endpoints take. */
+export const diaISO = (data: Date): string =>
+  data.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
+
 /** Groups an Angolan mobile number: +244 923 456 789. */
 export const formatTelefone = (bruto: string): string => {
   const digitos = bruto.replace(/\D/g, '');

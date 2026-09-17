@@ -5,6 +5,7 @@ import * as clientes from '../controllers/customers.controller.js';
 import * as dashboard from '../controllers/dashboard.controller.js';
 import * as motoristas from '../controllers/drivers.controller.js';
 import * as encomendas from '../controllers/orders.controller.js';
+import * as relatorios from '../controllers/reports.controller.js';
 import { requerAutenticacao, requerPapel } from '../middleware/authenticate.js';
 import { env } from '../config/env.js';
 
@@ -47,8 +48,8 @@ const limiteLogin = rateLimit({
 apiRouter.get('/', (_req, res) => {
   res.json({
     service: 'karga-api',
-    version: '0.3.0',
-    resources: ['auth', 'dashboard', 'orders', 'customers', 'drivers'],
+    version: '0.4.0',
+    resources: ['auth', 'dashboard', 'orders', 'customers', 'drivers', 'reports'],
   });
 });
 
@@ -81,6 +82,12 @@ apiRouter.post(
 apiRouter.get('/customers', operacao, rota(clientes.listar));
 apiRouter.post('/customers', operacao, rota(clientes.criar));
 apiRouter.get('/customers/:id', operacao, rota(clientes.obter));
+
+// ------------------------------------------------------------- relatórios
+apiRouter.get('/reports/summary', operacao, rota(relatorios.resumo));
+// The extension is part of the path because a browser download names the file from
+// the URL when a header is missing, and "orders" without one is a file nothing opens.
+apiRouter.get('/reports/orders.csv', operacao, rota(relatorios.exportarEncomendas));
 
 // ------------------------------------------------------------- motoristas
 apiRouter.get('/drivers', operacao, rota(motoristas.listar));

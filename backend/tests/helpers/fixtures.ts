@@ -109,17 +109,22 @@ export const criarEncomenda = async (dados: {
   status?: string;
   driverId?: string;
   expectedAt?: Date;
+  /** Reports are read over a window, so a test needs orders outside it too. */
+  createdAt?: Date;
+  completedAt?: Date;
+  destMunicipality?: string;
 }): Promise<{ id: string; code: string }> => {
   const { rows } = await query<{ id: string; code: string }>(
     `INSERT INTO orders (
        company_id, code, customer_id, driver_id, status, description,
        weight_grams, value_cents,
        origin_description, origin_municipality, dest_description, dest_municipality,
-       expected_delivery_at
+       expected_delivery_at, created_at, completed_at
      ) VALUES (
        $1, 'KRG-' || lpad(nextval('order_code_seq')::text, 6, '0'), $2, $3, $4::order_status,
        'Encomenda de teste', 1000, 50000,
-       'Armazém', 'Cacuaco', 'Casa do cliente', 'Talatona', $5
+       'Armazém', 'Cacuaco', 'Casa do cliente', $6,
+       $5, coalesce($7, now()), $8
      ) RETURNING id, code`,
     [
       dados.companyId,
@@ -127,6 +132,9 @@ export const criarEncomenda = async (dados: {
       dados.driverId ?? null,
       dados.status ?? 'CRIADO',
       dados.expectedAt ?? null,
+      dados.destMunicipality ?? 'Talatona',
+      dados.createdAt ?? null,
+      dados.completedAt ?? null,
     ],
   );
   const linha = rows[0];

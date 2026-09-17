@@ -7,6 +7,7 @@ import { Drivers } from './pages/Drivers';
 import { Login } from './pages/Login';
 import { OrderDetail } from './pages/OrderDetail';
 import { Orders } from './pages/Orders';
+import { Reports } from './pages/Reports';
 import { SystemStatus } from './pages/SystemStatus';
 import { ToastProvider } from './ui/Toast';
 import { LoadingState } from './ui/States';
@@ -80,6 +81,14 @@ export const App = () => (
             element={
               <Protegida roles={OPERACAO}>
                 <Drivers />
+              </Protegida>
+            }
+          />
+          <Route
+            path="relatorios"
+            element={
+              <Protegida roles={OPERACAO}>
+                <Reports />
               </Protegida>
             }
           />

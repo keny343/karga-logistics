@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, Package, Truck, XCircle } from 'lucide-react';
 import { api } from '../api/client';
-import { statusLabel, statusTone, type OrderStatus } from '../domain/orderStatus';
 import { useResource } from '../hooks/useResource';
+import { BarChart, type SerieBarra } from '../ui/BarChart';
 import { Card } from '../ui/Card';
+import { Distribution } from '../ui/Distribution';
 import { PageHeader } from '../ui/PageHeader';
 import { StatCard } from '../ui/StatCard';
 import { StatusBadge } from '../ui/Badge';
@@ -31,6 +32,8 @@ const COLUNAS: readonly TableColumn<OrderSummary>[] = [
   },
   { key: 'valor', header: 'Valor', numeric: true, render: (linha) => formatKz(linha.valueCents) },
 ];
+
+const SERIE_CRIADAS: readonly SerieBarra[] = [{ label: 'Criadas', tone: 'primary' }];
 
 export const Dashboard = () => {
   const navegar = useNavigate();
@@ -64,18 +67,21 @@ export const Dashboard = () => {
               value={data.ordersToday}
               icon={<Package size={16} />}
               tone="info"
+              to="/encomendas"
             />
             <StatCard
               label="Em entrega"
               value={data.inDelivery}
               icon={<Truck size={16} />}
               tone="info"
+              to="/encomendas?status=EM_ENTREGA"
             />
             <StatCard
               label="Entregues"
               value={data.delivered}
               icon={<CheckCircle2 size={16} />}
               tone="success"
+              to="/encomendas?status=ENTREGUE"
             />
             <StatCard
               label="Em atraso"
@@ -83,30 +89,37 @@ export const Dashboard = () => {
               hint={data.late > 0 ? 'Fora do prazo previsto' : 'Tudo dentro do prazo'}
               icon={<Clock size={16} />}
               tone={data.late > 0 ? 'warning' : 'neutral'}
+              to="/encomendas?late=true"
             />
             <StatCard
               label="Falhas"
               value={data.failed}
               icon={<XCircle size={16} />}
               tone={data.failed > 0 ? 'danger' : 'neutral'}
+              to="/encomendas?status=FALHA_ENTREGA"
             />
             <StatCard
               label="Motoristas em serviço"
               value={data.activeDrivers}
               icon={<Truck size={16} />}
+              to="/motoristas"
             />
           </div>
 
           <div className="painel-duplo">
-            <Card title="Encomendas por dia" >
-              <Grafico dados={data.perDay} />
+            <Card title="Encomendas por dia">
+              <BarChart
+                caption="Encomendas criadas por dia, nos últimos catorze dias"
+                series={SERIE_CRIADAS}
+                pontos={data.perDay.map((ponto) => ({ label: ponto.day, values: [ponto.count] }))}
+              />
             </Card>
 
             <Card title="Distribuição por estado">
               {data.byStatus.length === 0 ? (
                 <EmptyState title="Ainda não há encomendas." />
               ) : (
-                <Distribuicao dados={data.byStatus} />
+                <Distribution dados={data.byStatus} />
               )}
             </Card>
           </div>
@@ -137,58 +150,3 @@ export const Dashboard = () => {
   );
 };
 
-/**
- * A bar chart in plain CSS. A charting library would add a dependency and a
- * hundred kilobytes to draw fourteen rectangles, and this version reads the same
- * on a slow machine.
- */
-const Grafico = ({ dados }: { readonly dados: readonly { day: string; count: number }[] }) => {
-  const maximo = Math.max(1, ...dados.map((ponto) => ponto.count));
-
-  return (
-    <div className="grafico">
-      {dados.map((ponto) => {
-        const dia = new Date(`${ponto.day}T00:00:00`);
-        const etiqueta = dia.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
-        return (
-          <div className="grafico__coluna" key={ponto.day}>
-            <div
-              className="grafico__barra"
-              style={{ height: `${Math.max(2, (ponto.count / maximo) * 100)}%` }}
-              // The bar is decorative; the number and date live in the label below.
-              aria-hidden="true"
-            />
-            <span className="grafico__valor">{ponto.count}</span>
-            <span className="grafico__dia">{etiqueta}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const Distribuicao = ({
-  dados,
-}: {
-  readonly dados: readonly { status: OrderStatus; count: number }[];
-}) => {
-  const total = dados.reduce((soma, item) => soma + item.count, 0);
-  const ordenado = [...dados].sort((a, b) => b.count - a.count);
-
-  return (
-    <ul className="distribuicao">
-      {ordenado.map((item) => (
-        <li className="distribuicao__linha" key={item.status}>
-          <span className="distribuicao__rotulo">{statusLabel(item.status)}</span>
-          <span className="distribuicao__barra" aria-hidden="true">
-            <span
-              data-tone={statusTone(item.status)}
-              style={{ width: `${total === 0 ? 0 : (item.count / total) * 100}%` }}
-            />
-          </span>
-          <span className="distribuicao__valor">{item.count}</span>
-        </li>
-      ))}
-    </ul>
-  );
-};

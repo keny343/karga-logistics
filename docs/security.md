@@ -82,6 +82,25 @@ assigned to him). Each step is separate so a new endpoint cannot get half of it,
 and the route guards in the interface are convenience only — the API checks
 independently.
 
+## Exports
+
+**A CSV is code until proven otherwise.** Excel runs a cell that begins with `=`,
+`+`, `-` or `@`, so every exported field starting with one of those is prefixed with
+an apostrophe. The names and addresses in an export were typed into a form by
+somebody other than the person who opens the file, and `=HYPERLINK(...)` in a
+customer name is an attack on the operator, not a typo.
+
+**Bounded windows and bounded rows.** The report range cannot exceed 366 days and
+the export stops at 50 000 rows, so neither can be turned into a table scan that
+holds a connection open.
+
+**The filename is built from validated dates only.** Nothing from a request body
+reaches the `Content-Disposition` header, where a quote or a newline would let a
+caller write header content.
+
+**Every export is audited** with the window and the row count. Data leaving the
+system is exactly what an audit trail is for.
+
 ## Phase 7 (uploads)
 
 Proof-of-delivery photos will be validated on MIME type, extension, size and
@@ -98,7 +117,7 @@ and survive the deletion of the account that caused them.
 Recorded today: `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `ORDER_CREATED`,
 `ORDER_ASSIGNED`, `DELIVERY_PICKED_UP`, `DELIVERY_STARTED`, `DELIVERY_COMPLETED`,
 `DELIVERY_FAILED`, `ORDER_CANCELLED`, `ORDER_RETURNED`, `CUSTOMER_CREATED`,
-`DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`.
+`DRIVER_CREATED`, `DRIVER_STATUS_CHANGED`, `REPORT_EXPORTED`.
 
 A failed audit write never fails the request: by then the action has already
 succeeded, and refusing it afterwards would be worse than a missing row. The

@@ -97,6 +97,37 @@ driver who is off duty or already carrying a parcel, with a message that says
 which. `POST /api/orders/:id/status` takes `{ status, note? }`; the note is kept in
 the history and is how a failed delivery gets explained.
 
+## Reports
+
+| Method | Path | Roles |
+|--------|------|-------|
+| GET | `/api/reports/summary` | ADMIN, OPERADOR |
+| GET | `/api/reports/orders.csv` | ADMIN, OPERADOR |
+
+Both take `from` and `to` as Luanda dates (`YYYY-MM-DD`), inclusive on both ends. A
+window that runs backwards, contains a date that does not exist, or spans more than
+366 days answers `400`. The boundaries are Luanda midnights, so "1 to 30 September"
+means those days here rather than in UTC.
+
+`summary` is one response with every aggregate the screen shows: totals, a per-day
+series of created and delivered, a breakdown by status, per-driver performance, and
+the top destination municipalities. They are fetched together on purpose — split
+across endpoints, a client could display numbers that disagree because they were
+read a second apart.
+
+Two fields are deliberately nullable. `successRate` is `null` when nothing in the
+window has finished, because 0% would claim every delivery failed; and delivery time
+is reported as a **median**, since one parcel that sat in the warehouse over a
+weekend drags a mean far enough to make it useless for planning.
+
+`orders.csv` returns the same window as a file: `;` separated with a byte-order mark,
+because Excel in this locale reads a comma-separated file as one column. Any field
+starting with `=`, `+`, `-` or `@` is prefixed with an apostrophe so a spreadsheet
+cannot execute a value that arrived from a form. The response is capped at 50 000
+rows and carries the count in `X-Row-Count`. Every export is recorded in the audit
+trail with the window and the number of rows, because it takes customer names and
+phone numbers out of the system.
+
 ## Customers
 
 | Method | Path | Roles |
@@ -122,5 +153,5 @@ parcel answers `409`: the parcel would be left with nobody responsible for it.
 
 ## Planned
 
-Reports and exports (phase 4), addresses and the operational map (phase 5),
-Socket.IO events (phase 6), proof of delivery uploads (phase 7).
+Addresses and the operational map (phase 5), Socket.IO events (phase 6), proof of
+delivery uploads (phase 7).

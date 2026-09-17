@@ -1,0 +1,62 @@
+.relatorio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A refresh dims the numbers instead of replacing them with skeletons: the reader
+ * keeps their place while the new window loads. */
+.relatorio[data-refreshing='true'] {
+  opacity: 0.6;
+  transition: opacity var(--transition);
+}
+
+.periodo {
+  display: grid;
+  grid-template-columns: auto 10rem 10rem;
+  align-items: end;
+  gap: var(--space-4);
+}
+
+.periodo__atalhos {
+  display: flex;
+  gap: var(--space-2);
+  padding-bottom: 1px;
+}
+
+.totais {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.totais dt {
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.totais dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-card);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023px) {
+  .periodo {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .periodo__atalhos {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .periodo__atalhos {
+    flex-wrap: wrap;
+  }
+}

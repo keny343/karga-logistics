@@ -53,7 +53,7 @@ export const NAVEGACAO: readonly GrupoNav[] = [
   {
     title: 'Gestão',
     items: [
-      { to: '/relatorios', label: 'Relatórios', icon: ClipboardList, roles: OPERACAO, pending: true },
+      { to: '/relatorios', label: 'Relatórios', icon: ClipboardList, roles: OPERACAO },
       { to: '/notificacoes', label: 'Notificações', icon: Bell, roles: TODOS, pending: true },
       { to: '/definicoes', label: 'Definições', icon: Settings, roles: ['ADMIN'], pending: true },
     ],

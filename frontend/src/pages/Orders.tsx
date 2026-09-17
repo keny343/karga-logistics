@@ -61,6 +61,7 @@ export const Orders = () => {
   // The URL holds the filters, so a filtered list can be shared or reloaded.
   const estado = parametros.get('status') ?? '';
   const busca = parametros.get('search') ?? '';
+  const atrasadas = parametros.get('late') === 'true';
   const pagina = Number(parametros.get('page') ?? '1');
 
   const actualizar = useCallback(
@@ -81,14 +82,15 @@ export const Orders = () => {
     () => ({
       ...(estado !== '' ? { status: estado } : {}),
       ...(busca !== '' ? { search: busca } : {}),
+      ...(atrasadas ? { late: 'true' } : {}),
       page: pagina,
     }),
-    [estado, busca, pagina],
+    [estado, busca, atrasadas, pagina],
   );
 
   const { data, loading, error, refreshing, reload } = useResource(
     () => api.orders(filtros),
-    [estado, busca, pagina],
+    [estado, busca, atrasadas, pagina],
   );
 
   const podeCriar = user?.role === 'ADMIN' || user?.role === 'OPERADOR';
@@ -152,6 +154,18 @@ export const Orders = () => {
             </Button>
           </div>
         </form>
+
+        {/* A filter that came from a link on the dashboard has no control of its own
+            in this form, so it says so here and offers the way out. Otherwise the
+            list looks short for no visible reason. */}
+        {atrasadas ? (
+          <div className="filtro-activo">
+            <Badge tone="warning">Apenas atrasadas</Badge>
+            <button type="button" onClick={() => actualizar({ late: '' })}>
+              Mostrar todas
+            </button>
+          </div>
+        ) : null}
 
         {loading ? (
           <LoadingState rows={6} />

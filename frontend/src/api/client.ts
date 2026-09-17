@@ -184,6 +184,51 @@ export interface DashboardResumo {
   readonly recent: readonly OrderSummary[];
 }
 
+export interface Intervalo {
+  readonly from: string;
+  readonly to: string;
+}
+
+export interface RelatorioTotais {
+  readonly created: number;
+  readonly delivered: number;
+  readonly failed: number;
+  readonly cancelled: number;
+  readonly returned: number;
+  readonly inProgress: number;
+  readonly late: number;
+  readonly completed: number;
+  readonly valueCents: number;
+  readonly weightGrams: number;
+  /** Null when nothing in the window has finished yet, which is not the same as 0%. */
+  readonly successRate: number | null;
+  readonly medianDeliveryMinutes: number | null;
+}
+
+export interface Relatorio {
+  readonly range: Intervalo;
+  readonly totals: RelatorioTotais;
+  readonly perDay: readonly {
+    readonly day: string;
+    readonly created: number;
+    readonly delivered: number;
+  }[];
+  readonly byStatus: readonly { readonly status: OrderStatus; readonly count: number }[];
+  readonly byDriver: readonly {
+    readonly driverId: string;
+    readonly driverName: string;
+    readonly assigned: number;
+    readonly delivered: number;
+    readonly failed: number;
+    readonly medianDeliveryMinutes: number | null;
+  }[];
+  readonly byMunicipality: readonly {
+    readonly municipality: string;
+    readonly count: number;
+    readonly delivered: number;
+  }[];
+}
+
 export interface NovaEncomenda {
   readonly customerId: string;
   readonly description: string;
@@ -207,7 +252,13 @@ export const api = {
 
   dashboard: () => request<DashboardResumo>('/api/dashboard'),
 
-  orders: (filtros: { status?: string; search?: string; driverId?: string; page?: number }) =>
+  orders: (filtros: {
+    status?: string;
+    search?: string;
+    driverId?: string;
+    late?: string;
+    page?: number;
+  }) =>
     request<Pagina<OrderSummary>>(comFiltros('/api/orders', filtros)),
   order: (id: string) => request<{ order: Order }>(`/api/orders/${id}`),
   createOrder: (dados: NovaEncomenda) => enviar<{ order: Order }>('POST', '/api/orders', dados),
@@ -239,4 +290,59 @@ export const api = {
   }) => enviar<{ driver: Driver }>('POST', '/api/drivers', dados),
   setDriverStatus: (id: string, status: DriverStatus) =>
     enviar<{ driver: Driver }>('PATCH', `/api/drivers/${id}`, { status }),
+
+  report: (intervalo: Intervalo) =>
+    request<Relatorio>(comFiltros('/api/reports/summary', { ...intervalo })),
+
+  /**
+   * The export is a file, so it does not go through `request`: the response is a
+   * CSV, not the JSON envelope, and the browser has to be handed something to
+   * download. The blob is fetched rather than linked so an error arrives as a
+   * message on the screen instead of a downloaded file containing the error.
+   */
+  exportOrders: async (intervalo: Intervalo, status?: string): Promise<void> => {
+    const caminho = comFiltros('/api/reports/orders.csv', {
+      ...intervalo,
+      ...(status !== undefined && status !== '' ? { status } : {}),
+    });
+
+    let resposta: Response;
+    try {
+      resposta = await fetch(caminho, { credentials: 'include' });
+    } catch {
+      throw semRede();
+    }
+
+    if (!resposta.ok) {
+      const texto = await resposta.text();
+      let corpo: unknown = null;
+      try {
+        corpo = texto.length > 0 ? JSON.parse(texto) : null;
+      } catch {
+        corpo = null;
+      }
+      const temEnvelope =
+        corpo !== null && typeof corpo === 'object' && 'error' in (corpo as Record<string, unknown>);
+      throw new ApiError(
+        resposta.status,
+        temEnvelope
+          ? (corpo as ApiErrorBody)
+          : {
+              error: {
+                code: 'EXPORT_FAILED',
+                message: 'Não foi possível gerar a exportação. Tenta de novo.',
+              },
+            },
+      );
+    }
+
+    const ficheiro = await resposta.blob();
+    const url = URL.createObjectURL(ficheiro);
+    const ligacao = document.createElement('a');
+    ligacao.href = url;
+    ligacao.download = `karga-encomendas-${intervalo.from}-a-${intervalo.to}.csv`;
+    ligacao.click();
+    // Without this the blob stays in memory for the life of the page.
+    URL.revokeObjectURL(url);
+  },
 };

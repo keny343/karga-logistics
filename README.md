@@ -3,10 +3,11 @@
 Last-mile delivery operations for a carrier working in Luanda: orders, drivers,
 assignment, live tracking and proof of delivery.
 
-> **Status: phases 1 to 3 of 9.** Sessions, roles and company isolation are in
+> **Status: phases 1 to 4 of 9.** Sessions, roles and company isolation are in
 > place; customers, drivers and orders work end to end, driven by a state machine
-> with an audited history; the operator has a dashboard, an order list with
-> filters, and an order detail with a timeline and the actions the domain allows.
+> with an audited history; the operator has a dashboard whose numbers link to the
+> lists behind them, an order list with filters, an order detail with a timeline and
+> the actions the domain allows, and a report over any window with a CSV export.
 > The map, realtime tracking and proof of delivery are the phases that follow.
 > Nothing in this README describes something that is not in the repository — the
 > roadmap below marks what exists and what does not.
@@ -117,8 +118,8 @@ docker compose up
 ## Tests
 
 ```bash
-cd backend  && npm test    # 91 tests
-cd frontend && npm test    # 13 tests
+cd backend  && npm test    # 109 tests
+cd frontend && npm test    # 23 tests
 ```
 
 The backend suite runs against a real PostgreSQL, not mocks: what is worth
@@ -127,8 +128,10 @@ hold together. It covers every ordered pair of statuses against the transition
 table, login and lockout, session revocation, role refusals, cross-company
 requests answering `404`, assignment rules — including two operators assigning the
 same driver at the same moment, where exactly one must win — and the full path from
-creation to delivery. The frontend suite covers the screens' loading, empty and error states
-against a stubbed API.
+creation to delivery. Reports are tested for what falls inside a window and what does
+not, for the median rather than the mean, and for the CSV rules — escaping, and the
+neutralisation of a value a spreadsheet would execute. The frontend suite covers the
+screens' loading, empty and error states against a stubbed API.
 
 The backend suite needs a database. It defaults to `karga_test` on localhost and
 honours `TEST_DATABASE_URL`.
@@ -163,8 +166,9 @@ logs and in the `X-Request-Id` header:
 
 Available today: probes (`GET /health`, `GET /ready`), sessions
 (`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`), the
-dashboard aggregate, orders (list, create, read, assign, change state), customers
-and drivers. Full contract in [docs/api.md](docs/api.md).
+dashboard aggregate, orders (list, create, read, assign, change state), customers,
+drivers, and reports (`GET /api/reports/summary`, `GET /api/reports/orders.csv`).
+Full contract in [docs/api.md](docs/api.md).
 
 ## Documentation
 
@@ -180,8 +184,8 @@ and drivers. Full contract in [docs/api.md](docs/api.md).
 | 1 | Foundation: repo, database, migrations, error contract, observability, CI | **done** |
 | 2 | Authentication, roles, company isolation | **done** |
 | 3 | Customers, drivers, orders, state machine, assignment | **done** |
-| 4 | Reports, exports, richer dashboard | next |
-| 5 | Addresses, coordinates, operational map | — |
+| 4 | Reports, CSV export, dashboard that leads somewhere | **done** |
+| 5 | Addresses, coordinates, operational map | next |
 | 6 | Socket.IO: driver location, delivery updates, notifications | — |
 | 7 | Proof of delivery: photo, signature, timestamp, location | — |
 | 8 | Hardening: audit, performance, security review | — |
@@ -230,6 +234,21 @@ past it, and the loser still gets the sentence explaining why.
 `AT TIME ZONE 'Africa/Luanda'` rather than left to the database's configured zone,
 which in production is UTC. Otherwise, for the hour before midnight, the dashboard
 would report no orders while the day's parcels were already on the road.
+
+**Median delivery time, not average.** One parcel that sat in the warehouse over a
+weekend pulls a mean far enough to make it useless for planning a day. And with
+nothing finished in the window the success rate is reported as *no data* rather than
+0%, because 0% claims every delivery failed.
+
+**Exported values are neutralised against the spreadsheet that opens them.** A field
+starting with `=`, `+`, `-` or `@` gets an apostrophe in front of it. The names in an
+export were typed into a form by somebody other than the operator opening the file,
+and `=HYPERLINK(...)` in a customer name is an attack rather than a typo.
+
+**A KPI is a link.** "Seven late" is a question, and the answer is a filtered list, so
+the card is one click from the rows behind it. The list shows that it is filtered and
+offers the way out — a short list with no visible reason is a bug report waiting to
+happen.
 
 **Probes registered before CORS.** A misconfigured origin list must not be able to
 make the service look dead to the platform hosting it.
